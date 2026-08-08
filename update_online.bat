@@ -3,36 +3,15 @@ chcp 65001 > nul
 title Cap Nhat Shopee Video Manager Tu GitHub
 cd /d "%~dp0"
 
-echo =======================================================
-echo     TU DONG CAP NHAT PHAN MEM TU GITHUB
-echo     Phien Ban: V13.3 (Latest GitHub Release)
-echo     Repository: https://github.com/thincole/postshopee
-echo =======================================================
-echo.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0update_online.ps1"
 
-echo [1/4] Dang ket noi va tai ban cap nhat tu GitHub...
+if %errorlevel% neq 0 (
+    echo.
+    echo =======================================================
+    echo    [!] CAP NHAT THAT BAI!
+    echo    Vui long kiem tra lai ket noi Internet va thu lai.
+    echo =======================================================
+)
 
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$ProgressPreference='SilentlyContinue'; $t=Join-Path $pwd 'temp_update_bat'; if(Test-Path $t){Remove-Item -Recurse -Force $t}; New-Item -ItemType Directory -Path $t|Out-Null; $z=Join-Path $t 'update.zip'; $e=Join-Path $t 'extracted'; $url='https://github.com/thincole/postshopee/archive/refs/heads/main.zip'; try{Invoke-WebRequest -Uri $url -OutFile $z -UseBasicParsing}catch{$url='https://github.com/thincole/postshopee/archive/refs/heads/master.zip'; Invoke-WebRequest -Uri $url -OutFile $z -UseBasicParsing}; Write-Host '[2/4] Dang giai nen du lieu...'; Expand-Archive -LiteralPath $z -DestinationPath $e -Force; $root=Get-ChildItem -Path $e | Where-Object {$_.PSIsContainer} | Select-Object -First 1; $src=if($root){$root.FullName}else{$e}; Write-Host '[3/4] Dang ghi de ma nguon (Giu nguyen CSDL & .env)...'; $ex=@('node.exe','.env','.machine_id','database.sqlite','database.sqlite-shm','database.sqlite-wal','uploads','node_modules','.git','temp_update_bat'); Get-ChildItem -Path $src | ForEach-Object { if($ex -contains $_.Name -or $_.Name -like '*.rar' -or $_.Name -like '*.zip'){return}; $dest=Join-Path $pwd $_.Name; if($_.PSIsContainer){Copy-Item -Path $_.FullName -Destination $pwd -Recurse -Force}else{Copy-Item -Path $_.FullName -Destination $dest -Force} }; Write-Host '[4/4] Dang don dep bo nho tam...'; Remove-Item -Recurse -Force $t; Set-Content -Path (Join-Path $pwd '.current_commit') -Value 'v13.3-latest'"
-
-if %errorlevel% equ 0 goto :SUCCESS
-goto :ERROR
-
-:SUCCESS
-echo.
-echo =======================================================
-echo    CAP NHAT HOAN TAT THANH CONG! (PHIEN BAN V13.3)
-echo    Vui long khoi dong lai phan mem qua file start.bat
-echo =======================================================
-goto :END
-
-:ERROR
-echo.
-echo =======================================================
-echo    [!] CAP NHAT THAT BAI!
-echo    Vui long kiem tra lai ket noi Internet va thu lai.
-echo =======================================================
-goto :END
-
-:END
 echo.
 pause

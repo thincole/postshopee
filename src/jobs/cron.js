@@ -373,8 +373,8 @@ const cron = require(a0_0x2123aa(0x157)),
                   } catch(_proxyErr) {}
                 }
 
-                // Delay: rate-limit = 45-90s, proxy lỗi = 10-20s  
-                const _retryDelay = _isRateLimit ? (45 + Math.floor(Math.random() * 45)) : (10 + Math.floor(Math.random() * 10));
+                // Delay siêu tốc: rate-limit = 15-30s, proxy lỗi = 5-10s  
+                const _retryDelay = _isRateLimit ? (15 + Math.floor(Math.random() * 15)) : (5 + Math.floor(Math.random() * 5));
                 const _retryNextRun = Math.floor(Date.now() / 1000) + _retryDelay;
                 await Promise["all"]([
                   new Promise((_r, _j) =>
@@ -524,24 +524,15 @@ const cron = require(a0_0x2123aa(0x157)),
           }
         ));
 
-        // 4. AUTO-EQUALIZER: Nhường đường cho các tài khoản chạy chậm/ít video
-        const minRow = await new Promise((r) => db.get("SELECT MIN(videos_uploaded) as min_up, MAX(videos_uploaded) as max_up FROM threads WHERE status = 'inprogress'", [], (e, row) => r(row)));
-        if (minRow && minRow.min_up < 10 && minRow.max_up >= 25) {
-          const paceDelay = now + 180 + Math.floor(Math.random() * 120); // Chờ 3-5 phút
-          await new Promise((r) => db.run(
-            "UPDATE threads SET next_run_at = ? WHERE status = 'inprogress' AND videos_uploaded >= 25 AND (next_run_at IS NULL OR next_run_at < ?)",
-            [paceDelay, now],
-            function(e) {
-              if (!e && this.changes > 0) console.log("[Auto-Equalizer] Nhường đường cho tài khoản ít video (" + minRow.min_up + " v): tạm hoãn " + this.changes + " luồng đã >25 video");
-              r();
-            }
-          ));
-          // Reset error & delay cho tất cả tài khoản dưới 10 video để ưu tiên chạy ngay
-          await new Promise((r) => db.run(
-            "UPDATE threads SET error = NULL, next_run_at = 0 WHERE status = 'inprogress' AND videos_uploaded < 10",
-            [], () => r()
-          ));
-        }
+        // 4. AUTO-EQUALIZER THÔNG MINH: Giải phóng toàn bộ luồng bị hoãn để giữ tốc độ tối đa
+        await new Promise((r) => db.run(
+          "UPDATE threads SET next_run_at = 0, error = NULL WHERE status = 'inprogress' AND (next_run_at <= ? OR error LIKE '%Auto-Retry%')",
+          [now],
+          function(e) {
+            if (!e && this.changes > 0) console.log("[Auto-Equalizer] Giải phóng " + this.changes + " luồng để chạy liên tục");
+            r();
+          }
+        ));
 
       } catch (healthErr) {
         console.error("[Health Monitor] Error:", healthErr);
