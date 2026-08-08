@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Environment and Machine ID
+.env
+.machine_id
+
+# Database files
+database.sqlite
+database.sqlite-shm
+database.sqlite-wal
+
+# Uploads and Temp folders
+uploads/*
+!uploads/.gitkeep
+temp_update/
+
+# Archives & Logs
+*.rar
+*.zip
+*.log
+deob_error.log

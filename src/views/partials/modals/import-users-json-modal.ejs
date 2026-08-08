@@ -1,0 +1,29 @@
+<div class="modal fade" id="importJsonModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-filetype-json me-2"></i>Nhập Người Dùng Từ JSON</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="importJsonForm" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Chọn file JSON</label>
+                        <input type="file" class="form-control" name="userJsonFile" accept=".json" required>
+                    </div>
+                    <div class="alert alert-info small py-2">
+                        <strong>Format:</strong>
+                        <pre class="mb-0 mt-1" style="font-size:0.75rem">[
+  { "username": "user1", "cookie": "cookie1..." },
+  { "username": "user2", "cookie": "cookie2..." }
+]</pre>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Nhập</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

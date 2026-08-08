@@ -1,0 +1,719 @@
+<h2 class="mb-4"><i class="bi bi-gear-fill me-2"></i>Cài Đặt</h2>
+
+<div class="row">
+    <div class="col-lg-6">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header py-2" style="background: #2d3748; border-radius: 0;">
+                <h6 class="mb-0 text-white"><i class="bi bi-key-fill me-2"></i>Credit API</h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small">URL API</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
+                        <input type="text" class="form-control" id="creditUrlInput"
+                            placeholder="https://creditmls2026video.toolshopee.vn/api/sign">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small">API Key</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text"><i class="bi bi-shield-lock"></i></span>
+                        <input type="text" class="form-control" id="creditKeyInput" placeholder="X-API-Key...">
+                        <button class="btn btn-outline-secondary" type="button" onclick="toggleCreditKeyVisibility()"
+                            title="Hiện/Ẩn">
+                            <i class="bi bi-eye" id="creditKeyEyeIcon"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary btn-sm" onclick="saveCreditSettings()">
+                        <i class="bi bi-check-lg me-1"></i>Lưu cài đặt
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="loadCreditSettings()">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Tải lại
+                    </button>
+                    <button class="btn btn-outline-info btn-sm" onclick="checkCreditBalance()" id="creditBalanceBtn">
+                        <i class="bi bi-wallet2 me-1"></i>Kiểm tra số dư
+                    </button>
+                </div>
+                <div id="creditBalanceResult" class="mt-2" style="display:none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card shadow-sm mb-4" style="border-left: 3px solid var(--primary);">
+            <div class="card-body">
+                <h6 class="text-muted mb-3"><i class="bi bi-info-circle me-2"></i>Hướng dẫn</h6>
+                <ul class="small mb-0" style="line-height: 1.8;">
+                    <li><strong>URL API</strong>: Địa chỉ URL API</li>
+                    <li><strong>API Key</strong>: Key xác thực.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<div class="row">
+    <div class="col-lg-6">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header py-2" style="background: #37474f; border-radius: 0;">
+                <h6 class="mb-0 text-white"><i class="bi bi-link-45deg me-2"></i>API URL Key 1</h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small">URL Domain</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text"><i class="bi bi-globe"></i></span>
+                        <input type="text" class="form-control" id="apiUrlKey1Input" placeholder="https://domain.com">
+                    </div>
+                    <div class="form-text">Nhập domain API. Để trống sẽ dùng giá trị mặc định.</div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary btn-sm" onclick="saveApiUrlKey1()">
+                        <i class="bi bi-check-lg me-1"></i>Lưu
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="loadApiUrlKey1()">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Tải lại
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header py-2" style="background: #2e7d32; border-radius: 0;">
+                <h6 class="mb-0 text-white"><i class="bi bi-hdd-network-fill me-2"></i>Tích hợp HomeProxy (Proxy Tĩnh)
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small">API Token (Bearer)</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text"><i class="bi bi-shield-lock"></i></span>
+                        <input type="password" class="form-control" id="homeproxyTokenInput"
+                            placeholder="homepx42152_e21c0b975d1093642c0a6e95bd760a49a4f7bf5a2e67ba971535c18940288b1e">
+                        <button class="btn btn-outline-secondary" type="button"
+                            onclick="toggleHomeProxyTokenVisibility()" title="Hiện/Ẩn">
+                            <i class="bi bi-eye" id="homeproxyTokenEyeIcon"></i>
+                        </button>
+                    </div>
+                    <div class="form-text">Token API của HomeProxy. Dùng để tự động đồng bộ danh sách proxy tĩnh của bạn.</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small">x-merchant-id</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text"><i class="bi bi-person-badge"></i></span>
+                        <input type="text" class="form-control" id="homeproxyMerchantIdInput"
+                            placeholder="56cf5b7e-37ec-4589-8f5b-51ff94694126">
+                    </div>
+                    <div class="form-text">Mã Merchant ID từ trang API Docs của HomeProxy.</div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary btn-sm" onclick="saveHomeProxyToken()">
+                        <i class="bi bi-check-lg me-1"></i>Lưu Cấu Hình
+                    </button>
+                    <button class="btn btn-success btn-sm" onclick="syncHomeProxyProxies()" id="syncHomeProxyBtn">
+                        <i class="bi bi-arrow-repeat me-1"></i>Đồng bộ Proxy
+                    </button>
+                </div>
+                <div id="homeproxySyncResult" class="mt-2 small" style="display:none;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-6">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header py-2" style="background: #1565c0; border-radius: 0;">
+                <h6 class="mb-0 text-white"><i class="bi bi-hdd-network me-2"></i>Kiểm Tra Proxy</h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small">Danh sách proxy (mỗi dòng 1 proxy)</label>
+                    <textarea class="form-control form-control-sm" id="proxyCheckInput" rows="6"
+                        placeholder="IP:PORT&#10;IP:PORT:USER:PASS&#10;103.1.2.3:8080:admin:pass123"></textarea>
+                </div>
+                <div class="d-flex gap-2 align-items-center">
+                    <button class="btn btn-primary btn-sm" onclick="checkProxies()" id="checkProxyBtn">
+                        <i class="bi bi-lightning-charge me-1"></i>Check Proxy
+                    </button>
+                    <button class="btn btn-success btn-sm" onclick="importProxiesDirectly()" id="importProxyBtn">
+                        <i class="bi bi-download me-1"></i>Import Proxy
+                    </button>
+                    <button class="btn btn-danger btn-sm" onclick="clearAllProxies()" id="clearProxyBtn">
+                        <i class="bi bi-trash me-1"></i>Xóa Proxy
+                    </button>
+                    <span id="proxyCheckSummary" class="small"></span>
+                </div>
+                <div id="proxyCheckResults" class="mt-3" style="display:none;">
+                    <div class="table-responsive" style="max-height:250px;overflow-y:auto;">
+                        <table class="table table-sm table-bordered mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width:40px">#</th>
+                                    <th>Proxy</th>
+                                    <th style="width:80px">Ping</th>
+                                    <th style="width:100px">Trạng thái</th>
+                                </tr>
+                            </thead>
+                            <tbody id="proxyCheckTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card shadow-sm mb-4" style="border-left: 3px solid #1565c0;">
+            <div class="card-body">
+                <h6 class="text-muted mb-3"><i class="bi bi-info-circle me-2"></i>Hướng dẫn Proxy</h6>
+                <ul class="small mb-0" style="line-height: 1.8;">
+                    <li><strong>Format</strong>: <code>IP:PORT</code> hoặc <code>IP:PORT:USERNAME:PASSWORD</code></li>
+                    <li><strong>Check</strong>: Hệ thống gửi request qua proxy tới httpbin.org để kiểm tra kết nối.</li>
+                    <li><strong>Ping</strong>: Thời gian phản hồi (ms). Dưới 2000ms là tốt.</li>
+                    <li><strong>Kết quả</strong>: Xanh = sống, Đỏ = chết/timeout/sai auth.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-12">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header py-2" style="background: #0088cc; border-radius: 0;">
+                <h6 class="mb-0 text-white"><i class="bi bi-telegram me-2"></i>Báo Cáo Qua Telegram</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold small">Trình Cấu Hình Bot Token</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text"><i class="bi bi-key"></i></span>
+                            <input type="password" class="form-control" id="telegramTokenInput"
+                                placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ">
+                            <button class="btn btn-outline-secondary" type="button"
+                                onclick="toggleTelegramTokenVisibility()" title="Hiện/Ẩn">
+                                <i class="bi bi-eye" id="telegramTokenEyeIcon"></i>
+                            </button>
+                        </div>
+                        <div class="form-text">Nhập Token của Telegram Bot do @BotFather cung cấp.</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold small">Chat ID (Group/Channel/User)</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text"><i class="bi bi-chat-dots"></i></span>
+                            <input type="text" class="form-control" id="telegramChatIdInput"
+                                placeholder="-100123456789 hoặc 123456789">
+                        </div>
+                        <div class="form-text">Nhập Chat ID nơi nhận báo cáo (ID nhóm bắt đầu bằng dấu trừ
+                            <code>-</code>).
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <label class="form-label fw-semibold small d-block">Tùy Chọn Báo Cáo</label>
+                        <div class="form-check form-check-inline form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch"
+                                id="telegramReportSuccessInput">
+                            <label class="form-check-label small fw-semibold" for="telegramReportSuccessInput">Báo cáo
+                                khi chạy xong tất cả các luồng</label>
+                        </div>
+                        <div class="form-check form-check-inline form-switch ms-3">
+                            <input class="form-check-input" type="checkbox" role="switch"
+                                id="telegramReportHourlyInput">
+                            <label class="form-check-label small fw-semibold" for="telegramReportHourlyInput">Báo cáo
+                                tiến độ định kỳ mỗi giờ</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary btn-sm" onclick="saveTelegramSettings()">
+                        <i class="bi bi-check-lg me-1"></i>Lưu Cấu Hình
+                    </button>
+                    <button class="btn btn-outline-info btn-sm" onclick="testTelegramConnection()" id="testTelegramBtn">
+                        <i class="bi bi-send me-1"></i>Gửi Tin Nhắn Test
+                    </button>
+                </div>
+                <div id="telegramTestResult" class="mt-2 small" style="display:none;"></div>
+
+                <div class="mt-3 pt-3 border-top">
+                    <h6 class="small fw-semibold text-primary"><i class="bi bi-terminal me-1"></i>Điều Khiển Qua
+                        Telegram Bot (Gõ tin nhắn gửi tới Bot):</h6>
+                    <div class="row mt-2">
+                        <div class="col-md-6 mb-2">
+                            <span class="badge bg-secondary mb-1">Xóa luồng đã xong (Pending = 0):</span>
+                            <ul class="small mb-0 mt-1" style="list-style-type: square; padding-left: 20px;">
+                                <li><code>/xoaxong</code></li>
+                                <li><code>xóa xong</code></li>
+                                <li><code>xoaxong</code></li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <span class="badge bg-secondary mb-1">Tự động đổi proxy cho luồng gặp lỗi:</span>
+                            <ul class="small mb-0 mt-1" style="list-style-type: square; padding-left: 20px;">
+                                <li><code>/doiproxyloi</code></li>
+                                <li><code>đổi proxy lỗi</code></li>
+                                <li><code>doiproxyloi</code></li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="form-text mt-2 small text-warning"><i class="bi bi-shield-fill-check me-1"></i>Bot sẽ
+                        quét tin nhắn mới mỗi vài giây của cuộc trò chuyện dựa trên token/chat ID cấu hình. Chỉ xử lý
+                        lệnh khớp từ đúng Chat ID để bảo mật.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function loadCreditSettings() {
+        fetch('/api/config/credit')
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('creditUrlInput').value = data.credit_url || '';
+                document.getElementById('creditKeyInput').value = data.credit_key || '';
+            })
+            .catch(() => { });
+    }
+
+    function saveCreditSettings() {
+        const credit_url = document.getElementById('creditUrlInput').value.trim();
+        const credit_key = document.getElementById('creditKeyInput').value.trim();
+
+        if (!credit_url || !credit_key) {
+            showToast('URL và Key không được để trống', 'error');
+            return;
+        }
+
+        fetch('/api/config/credit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ credit_url, credit_key })
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('Lưu cài đặt credit thành công', 'success');
+                } else {
+                    showToast(data.message || 'Lỗi lưu cài đặt', 'error');
+                }
+            })
+            .catch(() => showToast('Lỗi kết nối', 'error'));
+    }
+
+    function toggleCreditKeyVisibility() {
+        const input = document.getElementById('creditKeyInput');
+        const icon = document.getElementById('creditKeyEyeIcon');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.className = 'bi bi-eye-slash';
+        } else {
+            input.type = 'password';
+            icon.className = 'bi bi-eye';
+        }
+    }
+
+    // === API URL Key 1 ===
+    function loadApiUrlKey1() {
+        fetch('/api/config/api-url-key1')
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('apiUrlKey1Input').value = data.api_url_key1 || '';
+            })
+            .catch(() => { });
+    }
+
+    function saveApiUrlKey1() {
+        const api_url_key1 = document.getElementById('apiUrlKey1Input').value.trim();
+        fetch('/api/config/api-url-key1', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ api_url_key1 })
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('Lưu API URL Key 1 thành công', 'success');
+                } else {
+                    showToast(data.message || 'Lỗi lưu', 'error');
+                }
+            })
+            .catch(() => showToast('Lỗi kết nối', 'error'));
+    }
+
+
+
+    // === Credit Balance Check ===
+    function checkCreditBalance() {
+        const btn = document.getElementById('creditBalanceBtn');
+        const result = document.getElementById('creditBalanceResult');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Đang kiểm tra...';
+        result.style.display = 'none';
+
+        fetch('/api/config/credit-balance')
+            .then(res => res.json())
+            .then(data => {
+                result.style.display = '';
+                if (data.success) {
+                    const statusBadge = data.is_active
+                        ? '<span class="badge bg-success">Active</span>'
+                        : '<span class="badge bg-danger">Inactive</span>';
+                    const creditClass = data.credits > 50 ? 'text-success' : data.credits > 10 ? 'text-warning' : 'text-danger';
+                    result.innerHTML = `
+                    <div class="alert alert-info py-2 mb-0 small">
+                        <i class="bi bi-person me-1"></i><strong>${data.username}</strong> ${statusBadge}
+                        <span class="ms-3"><i class="bi bi-wallet2 me-1"></i>Số dư: <strong class="${creditClass}">${data.credits} credits</strong></span>
+                    </div>`;
+                } else {
+                    result.innerHTML = `<div class="alert alert-danger py-2 mb-0 small">${data.error}</div>`;
+                }
+            })
+            .catch(() => {
+                result.style.display = '';
+                result.innerHTML = '<div class="alert alert-danger py-2 mb-0 small">Lỗi kết nối</div>';
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-wallet2 me-1"></i>Kiểm tra số dư';
+            });
+    }
+
+    // === Proxy Checker ===
+    function checkProxies() {
+        const input = document.getElementById('proxyCheckInput');
+        const btn = document.getElementById('checkProxyBtn');
+        const summary = document.getElementById('proxyCheckSummary');
+        const resultsDiv = document.getElementById('proxyCheckResults');
+        const tbody = document.getElementById('proxyCheckTable');
+
+        const lines = input.value.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        if (lines.length === 0) {
+            showToast('Nhập ít nhất 1 proxy', 'warning');
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Đang check...';
+        summary.textContent = `Đang check ${lines.length} proxy...`;
+        resultsDiv.style.display = 'none';
+
+        fetch('/api/config/check-proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ proxies: lines })
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (!data.success) {
+                    showToast(data.error || 'Lỗi check proxy', 'error');
+                    return;
+                }
+
+                const s = data.summary;
+                summary.innerHTML = `<span class="badge bg-success">${s.alive} sống</span> <span class="badge bg-danger">${s.dead} chết</span> / ${s.total} proxy`;
+
+                resultsDiv.style.display = '';
+                tbody.innerHTML = data.results.map((r, i) => {
+                    const statusBadge = r.alive
+                        ? `<span class="badge bg-success">Sống</span>`
+                        : `<span class="badge bg-danger">${r.error}</span>`;
+                    const pingText = r.alive ? `${r.ms}ms` : '-';
+                    const pingClass = r.alive ? (r.ms < 2000 ? 'text-success' : r.ms < 5000 ? 'text-warning' : 'text-danger') : 'text-muted';
+                    return `<tr class="${r.alive ? '' : 'table-danger'}">
+                <td class="small text-muted">${i + 1}</td>
+                <td class="small"><code>${r.proxy}</code></td>
+                <td class="small ${pingClass}">${pingText}</td>
+                <td>${statusBadge}</td>
+            </tr>`;
+                }).join('');
+            })
+            .catch(() => showToast('Lỗi kết nối', 'error'))
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-lightning-charge me-1"></i>Check Proxy';
+            });
+    }
+
+    function importProxiesDirectly() {
+        const input = document.getElementById('proxyCheckInput');
+        const btn = document.getElementById('importProxyBtn');
+        const summary = document.getElementById('proxyCheckSummary');
+        const resultsDiv = document.getElementById('proxyCheckResults');
+
+        const lines = input.value.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        if (lines.length === 0) {
+            showToast('Nhập ít nhất 1 proxy', 'warning');
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Đang import...';
+
+        fetch('/api/config/import-proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ proxies: lines })
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (!data.success) {
+                    showToast(data.error || 'Lỗi import proxy', 'error');
+                    return;
+                }
+                showToast(data.message, 'success');
+                summary.innerHTML = `<span class="badge bg-success">${lines.length} sống</span> / ${lines.length} proxy`;
+                resultsDiv.style.display = 'none';
+            })
+            .catch(() => showToast('Lỗi kết nối', 'error'))
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-download me-1"></i>Import Proxy';
+            });
+    }
+
+    function clearAllProxies() {
+        if (!confirm('Bạn có chắc chắn muốn xóa toàn bộ proxy trong database?')) {
+            return;
+        }
+        const btn = document.getElementById('clearProxyBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Đang xóa...';
+
+        fetch('/api/config/clear-proxies', {
+            method: 'DELETE'
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(data.message, 'success');
+                    document.getElementById('proxyCheckInput').value = '';
+                    document.getElementById('proxyCheckSummary').innerHTML = '';
+                    const resultsDiv = document.getElementById('proxyCheckResults');
+                    if (resultsDiv) resultsDiv.style.display = 'none';
+                } else {
+                    showToast(data.error || 'Lỗi khi xóa proxy', 'error');
+                }
+            })
+            .catch(() => showToast('Lỗi kết nối', 'error'))
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-trash me-1"></i>Xóa Proxy';
+            });
+    }
+
+    function loadSavedProxies() {
+        fetch('/api/config/saved-proxies')
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.proxies) {
+                    document.getElementById('proxyCheckInput').value = data.proxies.join('\n');
+                }
+            })
+            .catch(() => { });
+    }
+
+    function loadHomeProxyToken() {
+        fetch('/api/config/homeproxy-token')
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('homeproxyTokenInput').value = data.homeproxy_token || '';
+                    if (document.getElementById('homeproxyMerchantIdInput')) {
+                        document.getElementById('homeproxyMerchantIdInput').value = data.homeproxy_merchant_id || '';
+                    }
+                }
+            })
+            .catch(() => { });
+    }
+
+    function saveHomeProxyToken() {
+        const token = document.getElementById('homeproxyTokenInput').value.trim();
+        const merchantId = document.getElementById('homeproxyMerchantIdInput') ? document.getElementById('homeproxyMerchantIdInput').value.trim() : '';
+        fetch('/api/config/homeproxy-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ homeproxy_token: token, homeproxy_merchant_id: merchantId })
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('Lưu HomeProxy API Token & Merchant ID thành công', 'success');
+                } else {
+                    showToast(data.error || 'Lỗi lưu token', 'error');
+                }
+            })
+            .catch(() => showToast('Lỗi kết nối', 'error'));
+    }
+
+    function syncHomeProxyProxies() {
+        const btn = document.getElementById('syncHomeProxyBtn');
+        const result = document.getElementById('homeproxySyncResult');
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Đang đồng bộ...';
+        result.style.display = 'none';
+
+        fetch('/api/config/sync-homeproxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+            .then(res => res.json())
+            .then(data => {
+                result.style.display = '';
+                if (data.success) {
+                    result.innerHTML = `<div class="alert alert-success py-1 px-2 mb-0 small">${data.message}</div>`;
+                    showToast('Đồng bộ proxy thành công', 'success');
+                    loadSavedProxies();
+                } else {
+                    result.innerHTML = `<div class="alert alert-danger py-1 px-2 mb-0 small">${data.error}</div>`;
+                    showToast(data.error || 'Lỗi đồng bộ', 'error');
+                }
+            })
+            .catch(() => {
+                result.style.display = '';
+                result.innerHTML = '<div class="alert alert-danger py-1 px-2 mb-0 small">Lỗi kết nối</div>';
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Đồng bộ Proxy';
+            });
+    }
+
+    function toggleHomeProxyTokenVisibility() {
+        const input = document.getElementById('homeproxyTokenInput');
+        const icon = document.getElementById('homeproxyTokenEyeIcon');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.className = 'bi bi-eye-slash';
+        } else {
+            input.type = 'password';
+            icon.className = 'bi bi-eye';
+        }
+    }
+
+    function loadTelegramSettings() {
+        fetch('/api/config/telegram')
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.settings) {
+                    document.getElementById('telegramTokenInput').value = data.settings.telegram_token || '';
+                    document.getElementById('telegramChatIdInput').value = data.settings.telegram_chat_id || '';
+                    document.getElementById('telegramReportSuccessInput').checked = !!data.settings.telegram_report_success;
+                    document.getElementById('telegramReportHourlyInput').checked = !!data.settings.telegram_report_hourly;
+                }
+            })
+            .catch(() => { });
+    }
+
+    function saveTelegramSettings() {
+        const token = document.getElementById('telegramTokenInput').value.trim();
+        const chatId = document.getElementById('telegramChatIdInput').value.trim();
+        const reportSuccess = document.getElementById('telegramReportSuccessInput').checked ? 1 : 0;
+        const reportHourly = document.getElementById('telegramReportHourlyInput').checked ? 1 : 0;
+
+        fetch('/api/config/telegram', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                telegram_token: token,
+                telegram_chat_id: chatId,
+                telegram_report_success: reportSuccess,
+                telegram_report_hourly: reportHourly
+            })
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('Lưu cấu hình Telegram thành công', 'success');
+                } else {
+                    showToast(data.error || 'Lỗi lưu cấu hình', 'error');
+                }
+            })
+            .catch(() => showToast('Lỗi kết nối', 'error'));
+    }
+
+    function testTelegramConnection() {
+        const token = document.getElementById('telegramTokenInput').value.trim();
+        const chatId = document.getElementById('telegramChatIdInput').value.trim();
+        if (!token || !chatId) {
+            showToast('Vui lòng điền đủ Bot Token và Chat ID trước khi test', 'warning');
+            return;
+        }
+
+        const btn = document.getElementById('testTelegramBtn');
+        const result = document.getElementById('telegramTestResult');
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Đang test...';
+        result.style.display = 'none';
+
+        fetch('/api/config/test-telegram', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ telegram_token: token, telegram_chat_id: chatId })
+        })
+            .then(res => res.json())
+            .then(data => {
+                result.style.display = '';
+                if (data.success) {
+                    result.innerHTML = `<div class="alert alert-success py-1 px-2 mb-0 small">${data.message}</div>`;
+                    showToast('Gửi tin nhắn test thành công', 'success');
+                } else {
+                    result.innerHTML = `<div class="alert alert-danger py-1 px-2 mb-0 small">${data.error}</div>`;
+                    showToast(data.error || 'Lỗi gửi tin nhắn test', 'error');
+                }
+            })
+            .catch(() => {
+                result.style.display = '';
+                result.innerHTML = '<div class="alert alert-danger py-1 px-2 mb-0 small">Lỗi kết nối hoặc API Token sai</div>';
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-send me-1"></i>Gửi Tin Nhắn Test';
+            });
+    }
+
+    function toggleTelegramTokenVisibility() {
+        const input = document.getElementById('telegramTokenInput');
+        const icon = document.getElementById('telegramTokenEyeIcon');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.className = 'bi bi-eye-slash';
+        } else {
+            input.type = 'password';
+            icon.className = 'bi bi-eye';
+        }
+    }
+
+    // Load on tab shown
+    document.getElementById('settings-tab')?.addEventListener('shown.bs.tab', () => {
+        loadCreditSettings();
+        loadSavedProxies();
+        loadApiUrlKey1();
+        loadHomeProxyToken();
+        loadTelegramSettings();
+    });
+    document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => {
+            loadCreditSettings();
+            loadSavedProxies();
+            loadApiUrlKey1();
+            loadHomeProxyToken();
+            loadTelegramSettings();
+        }, 500);
+    });
+</script>
