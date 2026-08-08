@@ -10,6 +10,7 @@ class UpdaterService {
     this.repoUrl = `https://github.com/${this.repoOwner}/${this.repoName}`;
     this.commitFilePath = path.join(process.cwd(), '.current_commit');
     this.exclusions = [
+      'node.exe',
       '.env',
       '.machine_id',
       'database.sqlite',
