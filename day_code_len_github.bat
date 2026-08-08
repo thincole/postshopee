@@ -35,13 +35,16 @@ git branch -M main 2>nul
 
 :CHECK_MSG
 echo.
+for /f "tokens=*" %%a in ('powershell -NoProfile -Command "Get-Date -Format 'yyyyMMdd-HHmm'"') do set "TS=%%a"
+set "BUILD_VER=V13.3-%TS%"
+
 set "USER_MSG="
 set /p USER_MSG="[2/4] Nhap ghi chu commit (An Enter de dung mac dinh): "
 
 if defined USER_MSG (
-    set "COMMIT_MSG=%USER_MSG%"
+    set "COMMIT_MSG=[%BUILD_VER%] %USER_MSG%"
 ) else (
-    set "COMMIT_MSG=Cap nhat code moi"
+    set "COMMIT_MSG=Cap nhat code %BUILD_VER%"
 )
 
 echo.
@@ -59,7 +62,8 @@ goto :PUSH_ERROR
 :PUSH_SUCCESS
 echo.
 echo =======================================================
-echo    DAY CODE LEN GITHUB THANH CONG!
+echo    DAY CODE PHIEN BAN MOI LEN GITHUB THANH CONG!
+echo    Version: %COMMIT_MSG%
 echo    URL: https://github.com/thincole/postshopee
 echo =======================================================
 goto :END

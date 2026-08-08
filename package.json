@@ -1,6 +1,6 @@
 {
   "name": "tool-local-upload-shopee",
-  "version": "1.0.0",
+  "version": "13.3.0",
   "description": "Tool upload video local lên Shopee với Excel mapping",
   "main": "src/app.js",
   "license": "MIT",
