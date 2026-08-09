@@ -11,6 +11,23 @@
                         <label class="form-label">Chọn file JSON</label>
                         <input type="file" class="form-control" name="userJsonFile" accept=".json" required>
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Quốc Gia (Mặc định)</label>
+                        <select class="form-select" name="country">
+                            <option value="vn" selected>🇻🇳 Việt Nam</option>
+                            <option value="phss">🇵🇭 PH SlideShow</option>
+                            <option value="ar">🇦🇷 Argentina</option>
+                            <option value="sg">🇸🇬 Singapore</option>
+                            <option value="id">🇮🇩 Indonesia</option>
+                            <option value="th">🇹🇭 Thái Lan</option>
+                            <option value="my">🇲🇾 Malaysia</option>
+                            <option value="ph">🇵🇭 Philippines</option>
+                            <option value="br">🇧🇷 Brazil</option>
+                            <option value="mx">🇲🇽 México</option>
+                            <option value="tw">🇹🇼 Đài Loan</option>
+                        </select>
+                        <div class="form-text">Các tài khoản không ghi "country" trong JSON sẽ nhận quốc gia này.</div>
+                    </div>
                     <div class="alert alert-info small py-2">
                         <strong>Format:</strong>
                         <pre class="mb-0 mt-1" style="font-size:0.75rem">[

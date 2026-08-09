@@ -31,8 +31,8 @@
     }
   },
   "general": {
-    "delayMin": "200",
-    "delayMax": "300",
+    "delayMin": "168",
+    "delayMax": "200",
     "autoStart": true,
     "deleteOnSuccess": true
   }

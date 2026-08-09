@@ -17,6 +17,7 @@ router.post('/import-txt', upload.single('userFile'), async (req, res) => {
     const lines = rawData.trim().split('\n');
 
     const parsedData = [];
+    const defaultCountry = req.body.country ? req.body.country.trim().toLowerCase() : 'vn';
     const seenUsers = new Set();
 
     for (const line of lines) {
@@ -25,7 +26,7 @@ router.post('/import-txt', upload.single('userFile'), async (req, res) => {
       const username = parts[0].trim();
       const cookie = parts[1].trim();
       const proxy = parts[2] ? parts[2].trim() : '';
-      const country = parts[3] ? parts[3].trim().toLowerCase() : 'vn';
+      const country = parts[3] ? parts[3].trim().toLowerCase() : defaultCountry;
 
       if (!username || !cookie) continue;
       if (!seenUsers.has(username)) {
@@ -200,6 +201,7 @@ router.post('/import-json', upload.single('userJsonFile'), async (req, res) => {
 
     let added = 0;
     let updated = 0;
+    const defaultCountry = req.body.country ? req.body.country.trim().toLowerCase() : 'vn';
 
     for (const item of items) {
       if (!item.username || !item.cookie) continue;
@@ -208,12 +210,12 @@ router.post('/import-json', upload.single('userJsonFile'), async (req, res) => {
         await Promise.all([
           User.update(existing.id, item.username, item.cookie),
           User.updateProxy(existing.id, item.proxy || ''),
-          User.updateCountry(existing.id, item.country || 'vn'),
+          User.updateCountry(existing.id, item.country || defaultCountry),
           Thread.clearError(existing.id)
         ]);
         updated++;
       } else {
-        await User.create(item.username, item.cookie, item.proxy || '', item.country || 'vn');
+        await User.create(item.username, item.cookie, item.proxy || '', item.country || defaultCountry);
         added++;
       }
     }

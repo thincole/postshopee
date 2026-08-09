@@ -64,3 +64,39 @@ function updateTaskStats() {
     })
     .catch(() => {});
 }
+
+function loadProxyQueueLockSetting() {
+  fetch('/api/config/proxy-queue-lock')
+    .then(r => r.json())
+    .then(d => {
+      const sw1 = document.getElementById('useProxyQueueLockSwitch');
+      const sw2 = document.getElementById('settingsProxyQueueLockSwitch');
+      if (sw1) sw1.checked = !!d.enabled;
+      if (sw2) sw2.checked = !!d.enabled;
+    })
+    .catch(e => console.error('Error loading proxy queue lock setting:', e));
+}
+
+function toggleProxyQueueLock(enabled) {
+  fetch('/api/config/proxy-queue-lock', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: !!enabled })
+  })
+    .then(r => r.json())
+    .then(d => {
+      const sw1 = document.getElementById('useProxyQueueLockSwitch');
+      const sw2 = document.getElementById('settingsProxyQueueLockSwitch');
+      if (sw1) sw1.checked = !!d.enabled;
+      if (sw2) sw2.checked = !!d.enabled;
+      showToast(d.message || (d.enabled ? 'Đã BẬT Proxy Queue Lock (Xếp hàng IP)' : 'Đã TẮT Proxy Queue Lock (Chạy tự do ngày xưa)'), 'success');
+    })
+    .catch(e => {
+      console.error(e);
+      showToast('Lỗi cập nhật cài đặt Proxy Queue Lock', 'error');
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadProxyQueueLockSetting();
+});

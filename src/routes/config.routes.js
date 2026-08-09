@@ -20,17 +20,34 @@ db.run(`
 });
 
 // Add delete_video_on_success column to config if not exists
-db.run(`ALTER TABLE config ADD COLUMN delete_video_on_success INTEGER DEFAULT 0`, (err) => {
-  // Ignore error if column already exists
-  if (err && !err.message.includes('duplicate column')) {
-    console.error('Error adding delete_video_on_success column:', err);
-  }
-});
+db.run(`ALTER TABLE config ADD COLUMN delete_video_on_success INTEGER DEFAULT 0`, (err) => {});
+db.run(`ALTER TABLE config ADD COLUMN use_proxy_queue_lock INTEGER DEFAULT 1`, (err) => {});
 
 // Add video_deleted column to video_tasks if not exists (to track cleaned up files)
 db.run(`ALTER TABLE video_tasks ADD COLUMN video_deleted INTEGER DEFAULT 0`, (err) => {
   if (err && !err.message.includes('duplicate column')) {
     console.error('Error adding video_deleted column:', err);
+  }
+});
+
+// GET /api/config/proxy-queue-lock
+router.get('/proxy-queue-lock', async (req, res) => {
+  try {
+    const enabled = await Config.getUseProxyQueueLock();
+    res.json({ enabled: enabled === 1 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/config/proxy-queue-lock
+router.post('/proxy-queue-lock', async (req, res) => {
+  try {
+    const { enabled } = req.body;
+    const val = await Config.updateUseProxyQueueLock(enabled);
+    res.json({ success: true, enabled: val === 1, message: 'Đã cập nhật cài đặt Proxy Queue Lock' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 

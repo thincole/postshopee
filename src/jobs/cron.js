@@ -1,3 +1,4 @@
+const runningThreadIds = new Set();
 const a0_0x2123aa = a0_0x2ac9;
 (function (_0x120812, _0x188e3a) {
   const _0x2c297f = a0_0x2ac9,
@@ -93,8 +94,10 @@ const cron = require(a0_0x2123aa(0x157)),
             );
           });
         if (_0x2bb0bb["length"] === 0x0) return;
-        await Promise["all"](
-          _0x2bb0bb["map"](async (_0x5286b2) => {
+        _0x2bb0bb.forEach((_0x5286b2) => {
+          if (runningThreadIds.has(_0x5286b2.id)) return;
+          runningThreadIds.add(_0x5286b2.id);
+          (async () => {
             const _0x2c03bf = _0x3e18f6,
               _0x9687ef = {
                 oBxCf: function (_0x4ddd3f, _0x1b2ed0) {
@@ -208,16 +211,25 @@ const cron = require(a0_0x2123aa(0x157)),
                 }
               }
             }
-            const _proxyQueueKey = require("../utils/proxy-queue").getKey(_0x3318d7);
-            const _releaseProxy = await require("../utils/proxy-queue").acquire(_proxyQueueKey);
+            const _useQueueLock = await Config.getUseProxyQueueLock();
+            let _releaseProxy = null;
+            if (_useQueueLock === 1) {
+              const _proxyQueueKey = require("../utils/proxy-queue").getKey(_0x3318d7);
+              _releaseProxy = await require("../utils/proxy-queue").acquire(_proxyQueueKey);
+            }
             try {
+              const _videoFileToUpload = (_0xbefdaa["video_path"] && require('fs').existsSync(_0xbefdaa["video_path"])) ? _0xbefdaa["video_path"] : _0xbefdaa[_0x2c03bf(0x166)];
+              let _parsedProducts = _0xbefdaa["products"];
+              if (typeof _parsedProducts === 'string') {
+                try { _parsedProducts = JSON.parse(_parsedProducts); } catch(e) { _parsedProducts = []; }
+              }
               const _0x58c800 = await processLocalVideoUpload(
-                _0xbefdaa[_0x2c03bf(0x166)],
+                _videoFileToUpload,
                 {
                   cookie: _0x5286b2["cookie"] || "",
                   proxy: _0x3318d7,
                   caption: _0xbefdaa[_0x2c03bf(0x14d)],
-                  products: _0xbefdaa["products"],
+                  products: _parsedProducts,
                   country: _0x5286b2["country"] || "vn",
                 },
               );
@@ -373,8 +385,9 @@ const cron = require(a0_0x2123aa(0x157)),
                   } catch(_proxyErr) {}
                 }
 
-                // Delay siêu tốc: rate-limit = 15-30s, proxy lỗi = 5-10s  
-                const _retryDelay = _isRateLimit ? (15 + Math.floor(Math.random() * 15)) : (5 + Math.floor(Math.random() * 5));
+                // Delay: 'too many videos' = 15 phút (900s) cho Shopee nhả rate limit, proxy lỗi = 15-30s  
+                const _isShopeeRateLimit = _0x4b35f1.includes("too many") || _0x4b35f1.includes("please have a rest");
+                const _retryDelay = _isShopeeRateLimit ? (900 + Math.floor(Math.random() * 180)) : _isRateLimit ? (15 + Math.floor(Math.random() * 15)) : (5 + Math.floor(Math.random() * 5));
                 const _retryNextRun = Math.floor(Date.now() / 1000) + _retryDelay;
                 await Promise["all"]([
                   new Promise((_r, _j) =>
@@ -449,10 +462,11 @@ const cron = require(a0_0x2123aa(0x157)),
                 );
               }
             } finally {
-              _releaseProxy();
+              if (typeof _releaseProxy === 'function') _releaseProxy();
+              runningThreadIds.delete(_0x5286b2.id);
             }
-          }),
-        );
+          })();
+        });
       } catch (_0x3d0f2f) {
         console[_0x3e18f6(0x148)](_0x3e18f6(0x159), _0x3d0f2f);
       } finally {

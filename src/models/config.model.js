@@ -143,6 +143,7 @@ db["run"](createTableQuery, [], function (_0x28c509) {
   db.run("ALTER TABLE config ADD COLUMN telegram_report_success INTEGER DEFAULT 0", (err) => { });
   db.run("ALTER TABLE config ADD COLUMN telegram_report_hourly INTEGER DEFAULT 0", (err) => { });
   db.run("ALTER TABLE config ADD COLUMN is_aigc INTEGER DEFAULT 1", (err) => { });
+  db.run("ALTER TABLE config ADD COLUMN use_proxy_queue_lock INTEGER DEFAULT 1", (err) => { });
 });
 class Config {
   static async [a0_0x1ba884(0x103)]() {
@@ -466,6 +467,25 @@ class Config {
       db.run("UPDATE config SET is_aigc = ? WHERE id = 1", [isAigc ? 1 : 0], (err) => {
         if (err) return reject(err);
         resolve();
+      });
+    });
+  }
+
+  static async getUseProxyQueueLock() {
+    return new Promise((resolve) => {
+      db.get("SELECT use_proxy_queue_lock FROM config WHERE id = 1", [], (err, row) => {
+        if (err || !row) return resolve(1);
+        resolve(row.use_proxy_queue_lock !== 0 ? 1 : 0);
+      });
+    });
+  }
+
+  static async updateUseProxyQueueLock(enabled) {
+    const val = enabled ? 1 : 0;
+    return new Promise((resolve, reject) => {
+      db.run("UPDATE config SET use_proxy_queue_lock = ? WHERE id = 1", [val], (err) => {
+        if (err) return reject(err);
+        resolve(val);
       });
     });
   }
