@@ -344,7 +344,6 @@ const cron = require(a0_0x2123aa(0x157)),
               const _isTemporaryError = (
                 _0x4b35f1.includes("quá tải") ||
                 _0x4b35f1.includes("Empty token") ||
-                _0x4b35f1.includes("too many") ||
                 _0x4b35f1.includes("timeout") ||
                 _0x4b35f1.includes("Timeout") ||
                 _0x4b35f1.includes("ECONNRESET") ||
@@ -360,7 +359,7 @@ const cron = require(a0_0x2123aa(0x157)),
                 await VideoTask["updateStatus"](_0xbefdaa["id"], "pending");
 
                 // === AUTO-ROTATE PROXY khi bị rate-limit hoặc proxy chết ===
-                const _isRateLimit = _0x4b35f1.includes("too many") || _0x4b35f1.includes("quá tải") || _0x4b35f1.includes("502") || _0x4b35f1.includes("503");
+                const _isRateLimit = _0x4b35f1.includes("quá tải") || _0x4b35f1.includes("502") || _0x4b35f1.includes("503");
                 const _isProxyDead = _0x4b35f1.includes("Empty token") || _0x4b35f1.includes("ECONNRESET") || _0x4b35f1.includes("ECONNREFUSED") || _0x4b35f1.includes("proxy không kết nối");
 
                 let _newProxyMsg = "";
@@ -385,9 +384,8 @@ const cron = require(a0_0x2123aa(0x157)),
                   } catch(_proxyErr) {}
                 }
 
-                // Delay: 'too many videos' = 15 phút (900s) cho Shopee nhả rate limit, proxy lỗi = 15-30s  
-                const _isShopeeRateLimit = _0x4b35f1.includes("too many") || _0x4b35f1.includes("please have a rest");
-                const _retryDelay = _isShopeeRateLimit ? (900 + Math.floor(Math.random() * 180)) : _isRateLimit ? (15 + Math.floor(Math.random() * 15)) : (5 + Math.floor(Math.random() * 5));
+                // Delay: proxy lỗi = 15-30s  
+                const _retryDelay = _isRateLimit ? (15 + Math.floor(Math.random() * 15)) : (5 + Math.floor(Math.random() * 5));
                 const _retryNextRun = Math.floor(Date.now() / 1000) + _retryDelay;
                 await Promise["all"]([
                   new Promise((_r, _j) =>
@@ -405,10 +403,12 @@ const cron = require(a0_0x2123aa(0x157)),
                   }),
                 ]);
               } else if (
-                // === AUTO-STOP: Lỗi nghiêm trọng → dừng luồng hoàn toàn ===
+                // === AUTO-STOP: Lỗi nghiêm trọng hoặc quá tải tài khoản → dừng luồng hoàn toàn ===
                 _0x4b35f1.includes("IllegalUserState") ||
                 _0x4b35f1.includes("UserBanned") ||
-                _0x4b35f1.includes("AccountDisabled")
+                _0x4b35f1.includes("AccountDisabled") ||
+                _0x4b35f1.includes("too many") ||
+                _0x4b35f1.includes("please have a rest")
               ) {
                 await Promise["all"]([
                   VideoTask["updateStatus"](_0xbefdaa["id"], "pending"),
@@ -421,7 +421,7 @@ const cron = require(a0_0x2123aa(0x157)),
                   new Promise((_r, _j) =>
                     db["run"](
                       "UPDATE threads SET status = 'done', error = ? WHERE id = ?",
-                      ["[AUTO-STOP] TK bị Shopee khóa: " + _0x4b35f1, _0x5286b2["id"]],
+                      ["[AUTO-STOP] Shopee Rate Limit: " + _0x4b35f1, _0x5286b2["id"]],
                       (_e) => _e ? _j(_e) : _r(),
                     ),
                   ),
