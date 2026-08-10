@@ -554,20 +554,39 @@ async function fetchAndSyncHomeProxy() {
   for (const url of endpoints) {
     for (const makeConfig of authOptions) {
       try {
-        const response = await axios.get(url, {
-          ...makeConfig(token, merchantId),
-          timeout: 10000
-        });
+        let allPagesData = [];
+        let page = 1;
+        let hasNextPage = true;
 
-        const resData = response.data;
-        const list = Array.isArray(resData) ? resData :
-                     (Array.isArray(resData?.data) ? resData.data :
-                     (Array.isArray(resData?.result) ? resData.result :
-                     (Array.isArray(resData?.proxies) ? resData.proxies :
-                     (Array.isArray(resData?.list) ? resData.list : null))));
+        while (hasNextPage && page <= 50) {
+          const cfg = makeConfig(token, merchantId);
+          const response = await axios.get(url, {
+            ...cfg,
+            params: { ...(cfg.params || {}), page, limit: 100, size: 100, page_size: 100, per_page: 100 },
+            timeout: 10000
+          });
 
-        if (list && list.length >= 0) {
-          proxyData = list;
+          const resData = response.data;
+          const list = Array.isArray(resData) ? resData :
+                       (Array.isArray(resData?.data) ? resData.data :
+                       (Array.isArray(resData?.result) ? resData.result :
+                       (Array.isArray(resData?.proxies) ? resData.proxies :
+                       (Array.isArray(resData?.list) ? resData.list : null))));
+
+          if (list && list.length > 0) {
+            allPagesData = allPagesData.concat(list);
+            if (resData?.hasNextPage === false || list.length < 20 || Array.isArray(resData)) {
+              hasNextPage = false;
+            } else {
+              page++;
+            }
+          } else {
+            hasNextPage = false;
+          }
+        }
+
+        if (allPagesData.length > 0) {
+          proxyData = allPagesData;
           break;
         }
       } catch (err) {
