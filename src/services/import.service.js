@@ -38,15 +38,55 @@ async function downloadExcelFromDrive(url) {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
 
-  const response = await axios({
-    method: "GET",
-    url: downloadUrl,
-    responseType: "arraybuffer",
-    timeout: 30000,
-    maxRedirects: 5,
-  });
+  // Extract unique file/sheet ID for caching
+  const sheetIdMatch = url.match(/([a-zA-Z0-9_-]{25,})/);
+  const cacheKey = sheetIdMatch ? sheetIdMatch[1] : null;
+  if (cacheKey) {
+    const cachePath = path.join(uploadsDir, `drive_cache_${cacheKey}.xlsx`);
+    if (fs.existsSync(cachePath)) {
+      try {
+        const stats = fs.statSync(cachePath);
+        const ageMs = Date.now() - stats.mtimeMs;
+        // If downloaded within 3 minutes (180,000ms), reuse cache instantly!
+        if (ageMs < 180000 && stats.size > 1000) {
+          console.log(`⚡ [Google Sheet Cache] Dùng bản đệm cache (${Math.round(ageMs/1000)}s cũ):`, cachePath);
+          return cachePath;
+        }
+      } catch(e) {}
+    }
+  }
 
-  const destPath = path.join(uploadsDir, "drive_excel_" + Date.now() + ".xlsx");
+  let response = null;
+  let lastErr = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      response = await axios({
+        method: "GET",
+        url: downloadUrl,
+        responseType: "arraybuffer",
+        timeout: 30000,
+        maxRedirects: 5,
+        proxy: false,
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+      });
+      if (response && response.data) break;
+    } catch (err) {
+      lastErr = err;
+      if (attempt < 3) {
+        await new Promise(r => setTimeout(r, 1500));
+      }
+    }
+  }
+
+  if (!response || !response.data) {
+    throw new Error(lastErr ? lastErr.message : "Không thể tải file từ Google Drive");
+  }
+
+  const destPath = cacheKey 
+    ? path.join(uploadsDir, `drive_cache_${cacheKey}.xlsx`)
+    : path.join(uploadsDir, "drive_excel_" + Date.now() + ".xlsx");
   fs.writeFileSync(destPath, Buffer.from(response.data));
 
   return destPath;

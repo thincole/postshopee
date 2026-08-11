@@ -771,4 +771,41 @@ router.post('/test-telegram', async (req, res) => {
   }
 });
 
+// GET /api/config/proxy-mode
+router.get('/proxy-mode', async (req, res) => {
+  try {
+    let mode = 'homeproxy';
+    db.run("ALTER TABLE config ADD COLUMN proxy_mode TEXT DEFAULT 'homeproxy'", () => {});
+    const modeRow = await new Promise(r => db.get('SELECT proxy_mode FROM config WHERE id = 1', [], (e, row) => r(row)));
+    if (modeRow && modeRow.proxy_mode) mode = modeRow.proxy_mode;
+    res.json({ mode });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/config/proxy-mode
+router.post('/proxy-mode', async (req, res) => {
+  try {
+    const { mode } = req.body;
+    db.run("ALTER TABLE config ADD COLUMN proxy_mode TEXT DEFAULT 'homeproxy'", () => {});
+
+    if (mode === 'homeproxy') {
+      db.run("UPDATE config SET proxy_mode = 'homeproxy' WHERE id = 1", () => {});
+      const syncRes = await fetchAndSyncHomeProxy();
+      return res.json({
+        success: true,
+        mode: 'homeproxy',
+        message: `🌐 Đã chuyển sang chế độ Fake IP bằng HomeProxy (${syncRes.count || 0} Proxy tĩnh trong CSDL)`
+      });
+    } else {
+      db.run("UPDATE config SET proxy_mode = 'none' WHERE id = 1", () => {});
+      db.run("UPDATE threads SET proxy_host = NULL, proxy_port = NULL, proxy_username = NULL, proxy_password = NULL", () => {});
+      return res.json({ success: true, mode: 'none', message: '🚫 Đã chuyển sang chế độ sử dụng IP trực tiếp của máy tính (Không Proxy).' });
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;

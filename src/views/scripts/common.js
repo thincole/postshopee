@@ -97,6 +97,51 @@ function toggleProxyQueueLock(enabled) {
     });
 }
 
+function loadProxyModeStatus() {
+  fetch('/api/config/proxy-mode')
+    .then(r => r.json())
+    .then(d => {
+      const mode = d.mode || 'homeproxy';
+      const rHome = document.getElementById('proxyModeHomeProxy');
+      const rNone = document.getElementById('proxyModeNone');
+      const txt = document.getElementById('currentProxyModeStatusText');
+
+      if (mode === 'homeproxy') {
+        if (rHome) rHome.checked = true;
+        if (txt) txt.innerHTML = '<span class="badge bg-success">🌐 HomeProxy Tĩnh (Tự nạp từ CSDL)</span>';
+      } else {
+        if (rNone) rNone.checked = true;
+        if (txt) txt.innerHTML = '<span class="badge bg-secondary">🚫 Không dùng Proxy (IP Gốc Máy)</span>';
+      }
+    })
+    .catch(e => console.error('Error loading proxy mode status:', e));
+}
+
+function changeThreadsProxyMode(mode) {
+  fetch('/api/config/proxy-mode', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode })
+  })
+    .then(r => r.json())
+    .then(d => {
+      if (d.success) {
+        showToast(d.message, 'success');
+        loadProxyModeStatus();
+        if (typeof loadThreads === 'function') loadThreads();
+      } else {
+        showToast(d.error || 'Lỗi chuyển đổi chế độ Proxy', 'error');
+      }
+    })
+    .catch(e => {
+      console.error(e);
+      showToast('Lỗi chuyển đổi chế độ Proxy', 'error');
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   loadProxyQueueLockSetting();
+  loadProxyModeStatus();
+  updateTaskStats();
+  if (typeof loadThreads === 'function') loadThreads();
 });

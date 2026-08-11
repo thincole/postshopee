@@ -150,53 +150,42 @@ const cron = require(a0_0x2123aa(0x157)),
             }
             await VideoTask["updateStatus"](_0xbefdaa["id"], "uploading");
             let _0x3318d7 = null;
-            if (_0x5286b2["proxy_host"] && _0x5286b2["proxy_port"])
-              _0x3318d7 =
-                _0x5286b2[_0x2c03bf(0x180)] && _0x5286b2["proxy_password"]
-                  ? {
-                    host: _0x5286b2["proxy_host"],
-                    port: _0x5286b2[_0x2c03bf(0x14f)],
-                    auth: {
-                      username: _0x5286b2[_0x2c03bf(0x180)],
-                      password: _0x5286b2["proxy_password"],
-                    },
-                  }
-                  : {
-                    host: _0x5286b2["proxy_host"],
-                    port: _0x5286b2["proxy_port"],
-                  };
-            else {
-              if (_0x5286b2["user_proxy"]) {
-                const _0x235ac0 = _0x5286b2[_0x2c03bf(0x181)]["split"](":");
-                if (_0x3ce7c4["KFwUl"](_0x235ac0["length"], 0x2)) {
-                  _0x3318d7 = { host: _0x235ac0[0x0], port: _0x235ac0[0x1] };
-                  if (_0x235ac0["length"] === 0x4)
-                    _0x3318d7[_0x2c03bf(0x177)] = {
-                      username: _0x235ac0[0x2],
-                      password: _0x235ac0[0x3],
-                    };
+            if (_0x5286b2["proxy_host"] && _0x5286b2["proxy_port"]) {
+              _0x3318d7 = _0x5286b2["proxy_password"]
+                ? {
+                  host: _0x5286b2["proxy_host"],
+                  port: _0x5286b2["proxy_port"],
+                  auth: {
+                    username: _0x5286b2["proxy_username"],
+                    password: _0x5286b2["proxy_password"],
+                  },
                 }
+                : {
+                  host: _0x5286b2["proxy_host"],
+                  port: _0x5286b2["proxy_port"],
+                };
+            } else if (_0x5286b2["user_proxy"]) {
+              const _0x235ac0 = _0x5286b2["user_proxy"].split(":");
+              if (_0x235ac0.length >= 2) {
+                _0x3318d7 = { host: _0x235ac0[0], port: _0x235ac0[1] };
+                if (_0x235ac0.length === 4)
+                  _0x3318d7["auth"] = { username: _0x235ac0[2], password: _0x235ac0[3] };
               }
             }
+
+            // Fallback 1: Pick a random HomeProxy from database pool
             if (!_0x3318d7) {
               const randomProxyResult = await new Promise((resolve) => {
-                db.get(
-                  "SELECT proxy FROM proxies ORDER BY RANDOM() LIMIT 1",
-                  [],
-                  (err, row) => {
-                    resolve(row ? row.proxy : null);
-                  },
-                );
+                db.get("SELECT proxy FROM proxies ORDER BY RANDOM() LIMIT 1", [], (err, row) => {
+                  resolve(row ? row.proxy : null);
+                });
               });
               if (randomProxyResult) {
                 const parts = randomProxyResult.trim().split(":");
                 if (parts.length >= 2) {
                   _0x3318d7 = { host: parts[0], port: parts[1] };
                   if (parts.length === 4) {
-                    _0x3318d7["auth"] = {
-                      username: parts[2],
-                      password: parts[3],
-                    };
+                    _0x3318d7["auth"] = { username: parts[2], password: parts[3] };
                   }
                   await Thread.updateProxy(
                     _0x5286b2["id"],
@@ -204,9 +193,6 @@ const cron = require(a0_0x2123aa(0x157)),
                     parseInt(parts[1], 10),
                     parts[2] || null,
                     parts[3] || null,
-                  );
-                  console.log(
-                    `🤖 Auto Proxy: Thread ${_0x5286b2["id"]} automatically assigned random proxy from pool: ${randomProxyResult}`,
                   );
                 }
               }
@@ -379,7 +365,7 @@ const cron = require(a0_0x2123aa(0x157)),
                         [_pp[0], parseInt(_pp[1]), _pp[2] || null, _pp[3] || null, _0x5286b2["id"]],
                         (e) => e ? _j(e) : _r()
                       ));
-                      _newProxyMsg = " → Đã đổi proxy sang " + _pp[0];
+                      _newProxyMsg = " → Đã đổi HomeProxy sang " + _pp[0];
                     }
                   } catch(_proxyErr) {}
                 }

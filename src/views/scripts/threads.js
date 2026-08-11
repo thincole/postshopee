@@ -162,6 +162,7 @@ function loadThreads() {
     .then((threads) => {
       _cachedThreads = threads || [];
       renderThreadTable();
+      if (typeof updateTaskStats === 'function') updateTaskStats();
     })
     .catch((error) => console.error('Error loading threads:', error));
 }
@@ -1613,12 +1614,13 @@ function initAutoSaveImportConfig() {
   });
 }
 
-// Load import config on page initialization
+// Load import config and threads immediately on page initialization
 document.addEventListener('DOMContentLoaded', () => {
-  setTimeout(() => {
-    loadImportConfig();
-    initAutoSaveImportConfig();
-  }, 300);
+  loadImportConfig(true);
+  initAutoSaveImportConfig();
+  if (typeof loadThreads === 'function') {
+    loadThreads();
+  }
 });
 
 async function startSingleCountryImport(country, btn) {

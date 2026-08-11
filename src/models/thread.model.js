@@ -145,11 +145,15 @@ class Thread {
   }
 
   static async delete(id) {
-    const query = "DELETE FROM threads WHERE id = ?";
     return new Promise((resolve, reject) => {
-      db.run(query, [id], (err) => {
-        if (err) return reject(err);
-        resolve();
+      db.get("SELECT user_id FROM threads WHERE id = ?", [id], (err, row) => {
+        if (row && row.user_id) {
+          db.run("DELETE FROM video_tasks WHERE user_id = ?", [row.user_id], () => {});
+        }
+        db.run("DELETE FROM threads WHERE id = ?", [id], (err2) => {
+          if (err2) return reject(err2);
+          resolve();
+        });
       });
     });
   }

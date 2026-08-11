@@ -128,29 +128,7 @@
     </div>
 </div>
 
-<div class="row">
-    <div class="col-lg-12">
-        <div class="card shadow-sm mb-4" style="border-left: 4px solid var(--primary, #0d6efd);">
-            <div class="card-header py-2 bg-primary text-white">
-                <h6 class="mb-0 text-white"><i class="bi bi-shield-lock-fill me-2"></i>Cơ Chế Xếp Hàng Proxy (Proxy Queue Lock)</h6>
-            </div>
-            <div class="card-body">
-                <div class="form-check form-switch mb-2">
-                    <input class="form-check-input" type="checkbox" id="settingsProxyQueueLockSwitch" checked onchange="toggleProxyQueueLock(this.checked)">
-                    <label class="form-check-label fw-bold text-dark" for="settingsProxyQueueLockSwitch">
-                        Sử dụng Proxy Queue Lock (Xếp hàng giãn cách 8s giữa các luồng cùng IP Proxy)
-                    </label>
-                </div>
-                <div class="alert alert-light border small text-muted mb-0">
-                    <ul class="mb-0 ps-3">
-                        <li><strong>Tích chọn (ON - Khuyên dùng)</strong>: Xếp hàng chờ giãn cách 8 giây cho các tài khoản dùng chung 1 IP Proxy. Chống tuyệt đối lỗi 429 Too Many Requests và 503 Server quá tải.</li>
-                        <li><strong>Bỏ tích (OFF - Chế độ ngày xưa)</strong>: Tất cả các luồng cùng post tự do và đồng thời 100%. Proxy chia đều cho các tài khoản.</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+
 
 <div class="row">
     <div class="col-lg-6">
