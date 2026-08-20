@@ -271,6 +271,46 @@ class Thread {
       });
     });
   }
+
+  static async updateBatchStatus(status, threadIds = []) {
+    if (!Array.isArray(threadIds) || threadIds.length === 0) return;
+    const placeholders = threadIds.map(() => '?').join(',');
+    const query = status === 'inprogress'
+      ? `UPDATE threads SET status = 'inprogress', next_run_at = 0, error = NULL WHERE id IN (${placeholders})`
+      : `UPDATE threads SET status = 'stop' WHERE id IN (${placeholders})`;
+    return new Promise((resolve, reject) => {
+      db.run(query, threadIds, (err) => {
+        if (err) return reject(err);
+        resolve();
+      });
+    });
+  }
+
+  static async deleteBatch(threadIds = []) {
+    if (!Array.isArray(threadIds) || threadIds.length === 0) return;
+    const placeholders = threadIds.map(() => '?').join(',');
+    return new Promise((resolve, reject) => {
+      db.serialize(() => {
+        db.run(`DELETE FROM video_tasks WHERE user_id IN (SELECT user_id FROM threads WHERE id IN (${placeholders}))`, threadIds, () => {});
+        db.run(`DELETE FROM threads WHERE id IN (${placeholders})`, threadIds, (err) => {
+          if (err) return reject(err);
+          resolve();
+        });
+      });
+    });
+  }
+
+  static async deleteCompleted() {
+    return new Promise((resolve, reject) => {
+      db.serialize(() => {
+        db.run(`DELETE FROM video_tasks WHERE user_id IN (SELECT user_id FROM threads WHERE status = 'done' AND count_video_upload <= videos_uploaded)`, [], () => {});
+        db.run(`DELETE FROM threads WHERE status = 'done' AND count_video_upload <= videos_uploaded`, [], (err) => {
+          if (err) return reject(err);
+          resolve();
+        });
+      });
+    });
+  }
 }
 
 // Self-executing setup logic on startup

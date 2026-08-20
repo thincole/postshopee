@@ -144,6 +144,9 @@ db["run"](createTableQuery, [], function (_0x28c509) {
   db.run("ALTER TABLE config ADD COLUMN telegram_report_hourly INTEGER DEFAULT 0", (err) => { });
   db.run("ALTER TABLE config ADD COLUMN is_aigc INTEGER DEFAULT 1", (err) => { });
   db.run("ALTER TABLE config ADD COLUMN use_proxy_queue_lock INTEGER DEFAULT 1", (err) => { });
+  db.run("ALTER TABLE config ADD COLUMN sign_mode TEXT DEFAULT 'credit'", (err) => { });
+  db.run("ALTER TABLE config ADD COLUMN phone_sign_url TEXT DEFAULT 'http://127.0.0.1:8080'", (err) => { });
+  db.run("ALTER TABLE config ADD COLUMN phone_sign_key TEXT DEFAULT 'secret_key'", (err) => { });
 });
 class Config {
   static async [a0_0x1ba884(0x103)]() {
@@ -235,47 +238,51 @@ class Config {
     }
   }
   static async ["getCreditSettings"]() {
-    const _0x45606d = a0_0x1ba884,
-      _0x549287 = { GsVTb: _0x45606d(0x117) };
-    return new Promise((_0x175748, _0x4fc181) => {
-      const _0xc2dbb4 = _0x45606d;
-      db[_0xc2dbb4(0xee)](
-        _0x549287[_0xc2dbb4(0x11f)],
+    return new Promise((resolve, reject) => {
+      db.get(
+        "SELECT * FROM config WHERE id = 1",
         [],
-        (_0x4b6c20, _0x335f0f) => {
-          const _0x4a6c1a = _0xc2dbb4;
-          if (_0x4b6c20) return _0x4fc181(_0x4b6c20);
-          _0x175748({
-            credit_url: _0x335f0f?.[_0x4a6c1a(0x10f)] || _0x4a6c1a(0x122),
-            credit_key:
-              _0x335f0f?.["credit_key"] ||
-              "Gte3Ka4W2Y2RTJ7MdcqFYua6nnMOImWx7BU2e2ZcseG5gBvU",
+        (err, row) => {
+          if (err) return reject(err);
+          const sign_mode = row?.sign_mode || "credit";
+          const defaultCreditUrl = "https://creditmls2026video.toolshopee.vn/api/sign";
+          const defaultCreditKey = "Gte3Ka4W2Y2RTJ7MdcqFYua6nnMOImWx7BU2e2ZcseG5gBvU";
+          const phone_sign_url = row?.phone_sign_url || "http://127.0.0.1:8080";
+          const phone_sign_key = row?.phone_sign_key || "secret_key";
+          const credit_url = row?.credit_url || defaultCreditUrl;
+          const credit_key = row?.credit_key || defaultCreditKey;
+
+          const active_url = sign_mode === "phone" ? phone_sign_url : credit_url;
+          const active_key = sign_mode === "phone" ? phone_sign_key : credit_key;
+
+          resolve({
+            sign_mode,
+            credit_url: active_url,
+            credit_key: active_key,
+            raw_credit_url: credit_url,
+            raw_credit_key: credit_key,
+            phone_sign_url,
+            phone_sign_key,
           });
-        },
+        }
       );
     });
   }
-  static async ["updateCreditSettings"](_0xe0ffe5, _0x27592d) {
-    const _0x2feaca = {
-      WADDL: function (_0x5c9835, _0xdb9687) {
-        return _0x5c9835(_0xdb9687);
-      },
-    };
-    return new Promise((_0x53b93b, _0x3ba736) => {
-      const _0x2debaf = a0_0x1012,
-        _0x5d9d8a = {
-          RiqEq: function (_0xbf0c2, _0x3ccf63) {
-            return _0x2feaca["WADDL"](_0xbf0c2, _0x3ccf63);
-          },
-        };
-      db[_0x2debaf(0xf6)](
-        _0x2debaf(0x100),
-        [_0xe0ffe5, _0x27592d],
-        (_0x2ce806) => {
-          if (_0x2ce806) return _0x5d9d8a["RiqEq"](_0x3ba736, _0x2ce806);
-          _0x53b93b();
-        },
-      );
+  static async ["updateCreditSettings"](credit_url, credit_key, sign_mode = 'credit', phone_sign_url = 'http://127.0.0.1:8080', phone_sign_key = 'secret_key') {
+    return new Promise((resolve, reject) => {
+      db.serialize(() => {
+        db.run("ALTER TABLE config ADD COLUMN sign_mode TEXT DEFAULT 'credit'", (err) => { });
+        db.run("ALTER TABLE config ADD COLUMN phone_sign_url TEXT DEFAULT 'http://127.0.0.1:8080'", (err) => { });
+        db.run("ALTER TABLE config ADD COLUMN phone_sign_key TEXT DEFAULT 'secret_key'", (err) => { });
+        db.run(
+          "UPDATE config SET credit_url = ?, credit_key = ?, sign_mode = ?, phone_sign_url = ?, phone_sign_key = ? WHERE id = 1",
+          [credit_url, credit_key, sign_mode, phone_sign_url, phone_sign_key],
+          (err) => {
+            if (err) return reject(err);
+            resolve();
+          }
+        );
+      });
     });
   }
   static async [a0_0x1ba884(0x118)]() {

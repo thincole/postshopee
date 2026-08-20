@@ -28,7 +28,7 @@ function saveUserProxy(userId) {
     .catch(() => showToast('Lỗi kết nối', 'error'));
 }
 
-function saveUserCountry(userId, country) {
+function saveUserCountry(userId, country, selectEl) {
   fetch(`/api/users/${userId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -38,12 +38,58 @@ function saveUserCountry(userId, country) {
     .then(data => {
       if (data.success) {
         showToast('Cập nhật quốc gia thành công', 'success');
-        loadUsers();
+        if (selectEl) {
+          const row = selectEl.closest('tr.user-row');
+          if (row) {
+            row.dataset.country = country;
+            filterUsers();
+          }
+        } else {
+          loadUsers();
+        }
       } else {
         showToast(data.message || 'Lỗi', 'error');
       }
     })
     .catch(() => showToast('Lỗi kết nối', 'error'));
+}
+
+function filterUsers() {
+  const searchInput = document.getElementById('userSearchInput');
+  const countryFilter = document.getElementById('userCountryFilter');
+  const query = (searchInput ? searchInput.value : '').trim().toLowerCase();
+  const selectedCountry = countryFilter ? countryFilter.value : 'all';
+
+  const rows = document.querySelectorAll('#userTableBody tr.user-row');
+  let visibleCount = 0;
+
+  rows.forEach((row) => {
+    const country = (row.dataset.country || 'vn').toLowerCase();
+    const username = (row.dataset.username || '').toLowerCase();
+    const proxy = (row.dataset.proxy || '').toLowerCase();
+    const cookie = (row.querySelector('input[readonly]')?.value || '').toLowerCase();
+
+    const matchCountry = selectedCountry === 'all' || country === selectedCountry;
+    const matchQuery = !query || username.includes(query) || proxy.includes(query) || cookie.includes(query);
+
+    if (matchCountry && matchQuery) {
+      row.classList.remove('d-none');
+      visibleCount++;
+      const indexCell = row.querySelector('.user-index');
+      if (indexCell) indexCell.textContent = visibleCount;
+    } else {
+      row.classList.add('d-none');
+    }
+  });
+
+  const summaryBadge = document.getElementById('userCountSummary');
+  if (summaryBadge) {
+    if (selectedCountry === 'all' && !query) {
+      summaryBadge.textContent = `Tổng: ${rows.length} tài khoản`;
+    } else {
+      summaryBadge.textContent = `Hiển thị: ${visibleCount} / ${rows.length} tài khoản`;
+    }
+  }
 }
 
 function toggleUserActive(userId, isActive, username) {
@@ -113,7 +159,7 @@ function showBulkThreadModal() {
 
 function toggleAllUsers(checkbox) {
   const userCheckboxes = document.querySelectorAll(
-    '.user-checkbox:not(:disabled)'
+    '#userTableBody tr.user-row:not(.d-none) .user-checkbox:not(:disabled)'
   );
   userCheckboxes.forEach((box) => {
     box.checked = checkbox.checked;
@@ -157,17 +203,22 @@ function loadUsers() {
     .then((html) => {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
-      const userTableBody = document.querySelector('table tbody');
-      const newUserTableBody = doc.querySelector('table tbody');
-      userTableBody.innerHTML = newUserTableBody.innerHTML;
+      const userTableBody = document.getElementById('userTableBody') || document.querySelector('table tbody');
+      const newUserTableBody = doc.getElementById('userTableBody') || doc.querySelector('table tbody');
+      if (userTableBody && newUserTableBody) {
+        userTableBody.innerHTML = newUserTableBody.innerHTML;
+      }
 
       // Update the user select dropdown in the thread creation modal
       const userSelect = document.getElementById('userSelectForThread');
       const newUserSelect = doc.getElementById('userSelectForThread');
-      userSelect.innerHTML = newUserSelect.innerHTML;
+      if (userSelect && newUserSelect) {
+        userSelect.innerHTML = newUserSelect.innerHTML;
+      }
 
       // Re-attach event listeners and update delete buttons
       updateUserTableDeleteButtons();
+      filterUsers();
     })
     .catch((error) => {
       console.error('Error:', error);

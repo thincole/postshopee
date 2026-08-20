@@ -1,38 +1,38 @@
 {
-  "customCountryCode": "PH",
+  "customCountryCode": "MY",
   "countries": {
     "vn": {
-      "videoFolder": "G:\\My Drive\\Video AI\\VN\\Xu huong 2\\16s",
+      "videoFolder": "G:\\My Drive\\Video AI\\VN\\",
       "driveLink": "https://docs.google.com/spreadsheets/d/18OE86tzWPeKp3xlSYscmJFEQC87ZBuBwgTF8HOz8e1w/edit?gid=1878059944#gid=1878059944",
       "sheetName": "VN",
-      "maxVideosPerAccount": "45",
+      "maxVideosPerAccount": "49",
       "isAigc": true
     },
     "ph": {
       "videoFolder": "G:\\My Drive\\Video AI\\PH",
       "driveLink": "https://docs.google.com/spreadsheets/d/18OE86tzWPeKp3xlSYscmJFEQC87ZBuBwgTF8HOz8e1w/edit?gid=623566425#gid=623566425",
       "sheetName": "PH",
-      "maxVideosPerAccount": "50",
+      "maxVideosPerAccount": "59",
       "isAigc": true
     },
     "id": {
       "videoFolder": "G:\\My Drive\\Video AI\\ID",
       "driveLink": "https://docs.google.com/spreadsheets/d/18OE86tzWPeKp3xlSYscmJFEQC87ZBuBwgTF8HOz8e1w/edit?usp=sharing",
       "sheetName": "ID",
-      "maxVideosPerAccount": "50",
+      "maxVideosPerAccount": "70",
       "isAigc": true
     },
     "custom": {
-      "videoFolder": "G:\\My Drive\\Video AI\\PH\\SlideShowPH",
+      "videoFolder": "G:\\My Drive\\Video AI\\MY",
       "driveLink": "https://docs.google.com/spreadsheets/d/18OE86tzWPeKp3xlSYscmJFEQC87ZBuBwgTF8HOz8e1w/edit?usp=sharing",
-      "sheetName": "PHSS",
-      "maxVideosPerAccount": "50",
-      "isAigc": false
+      "sheetName": "MY",
+      "maxVideosPerAccount": "30",
+      "isAigc": true
     }
   },
   "general": {
-    "delayMin": "168",
-    "delayMax": "200",
+    "delayMin": "68",
+    "delayMax": "102",
     "autoStart": true,
     "deleteOnSuccess": true
   }

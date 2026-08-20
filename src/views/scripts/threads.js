@@ -170,17 +170,32 @@ function loadThreads() {
 function renderThreadTable() {
   const threads = _cachedThreads || [];
   const searchVal = (document.getElementById('threadSearchInput')?.value || '').trim().toLowerCase();
+  const countryVal = document.getElementById('threadCountryFilter')?.value || 'all';
   const statusVal = document.getElementById('threadStatusFilter')?.value || 'all';
 
   let filtered = threads;
 
+  if (countryVal !== 'all') {
+    filtered = filtered.filter(t => (t.country || 'vn').toLowerCase() === countryVal.toLowerCase());
+  }
+
   if (searchVal) {
-    filtered = filtered.filter(t => 
-      (t.username || '').toLowerCase().includes(searchVal) ||
-      (t.country || '').toLowerCase().includes(searchVal) ||
-      (t.proxy_host || '').toLowerCase().includes(searchVal) ||
-      (t.error || '').toLowerCase().includes(searchVal)
-    );
+    filtered = filtered.filter(t => {
+      const uMatch = (t.username || '').toLowerCase().includes(searchVal);
+      const cMatch = (t.country || '').toLowerCase() === searchVal;
+      // Tránh việc search "id" bị khớp nhầm đuôi tên miền proxy ".id.vn" của tài khoản PH/VN
+      let pMatch = false;
+      if (t.proxy_host) {
+        const pHost = t.proxy_host.toLowerCase();
+        if (searchVal === 'id' || searchVal === 'vn' || searchVal === 'ph' || searchVal === 'my') {
+          pMatch = false; // Khi tìm mã quốc gia ngắn, không tìm trong domain proxy
+        } else {
+          pMatch = pHost.includes(searchVal);
+        }
+      }
+      const eMatch = (t.error || '').toLowerCase().includes(searchVal);
+      return uMatch || cMatch || pMatch || eMatch;
+    });
   }
 
   if (statusVal !== 'all') {
@@ -625,35 +640,71 @@ function changeRandomProxy(threadId) {
 
 function deleteThread(id) {
   if (confirm('Bạn có chắc chắn muốn xóa luồng này không?')) {
+    // Optimistically remove row from DOM immediately (0ms response)
+    const row = document.getElementById('threadRow_' + id);
+    if (row) row.remove();
+    _cachedThreads = _cachedThreads.filter(t => t.id !== id);
+    showToast('🗑️ Đang xóa luồng...', 'info');
+
     fetch(`/api/threads/${id}`, {
       method: 'DELETE',
     })
       .then((response) => response.json())
       .then((data) => {
+        showToast('Xóa luồng thành công', 'success');
         loadUsers();
         loadThreads();
-        showToast('Xóa luồng thành công', 'success');
       })
       .catch((error) => {
         console.error('Error:', error);
         showToast('Lỗi khi xóa luồng', 'error');
+        loadThreads();
       });
   }
 }
 
 function toggleThreadStatus(id) {
+  const row = document.getElementById('threadRow_' + id);
+  const btn = row ? row.querySelector('td:last-child button:first-child') : null;
+  const statusBadge = row ? row.querySelector('td:nth-last-child(2) span.badge') : null;
+
+  // Optimistic UI update (0ms instant response)
+  if (btn && statusBadge) {
+    const isCurrentlyStopped = btn.classList.contains('btn-success');
+    if (isCurrentlyStopped) {
+      btn.className = 'btn btn-sm btn-warning';
+      btn.innerHTML = '<i class="bi bi-pause-fill"></i>';
+      btn.title = 'Dừng';
+      statusBadge.className = 'badge bg-primary';
+      statusBadge.innerHTML = '<i class="bi bi-play-circle me-1"></i>Đang chạy';
+    } else {
+      btn.className = 'btn btn-sm btn-success';
+      btn.innerHTML = '<i class="bi bi-play-fill"></i>';
+      btn.title = 'Bắt đầu';
+      statusBadge.className = 'badge bg-secondary';
+      statusBadge.innerHTML = '<i class="bi bi-stop-circle me-1"></i>Dừng';
+    }
+  }
+
   fetch(`/api/threads/${id}/toggle-status`, {
     method: 'PUT',
   })
     .then((response) => response.json())
     .then((data) => {
-      loadUsers();
-      loadThreads();
-      showToast('Trạng thái luồng được cập nhật thành công', 'success');
+      if (data.success) {
+        showToast('Trạng thái luồng được cập nhật thành công', 'success');
+        // Update memory cache
+        const t = _cachedThreads.find(x => x.id === id);
+        if (t) t.status = data.status;
+      } else {
+        showToast(data.error || 'Lỗi cập nhật', 'error');
+        loadThreads();
+      }
     })
     .catch((error) => {
       console.error('Error:', error);
       showToast('Lỗi khi cập nhật trạng thái luồng', 'error');
+      loadThreads();
     });
 }
 
@@ -679,22 +730,46 @@ function startSelectedThreads() {
     return;
   }
 
-  Promise.all(
-    selectedThreads.map((id) =>
-      fetch(`/api/threads/${id}/toggle-status`, {
-        method: 'PUT',
-      }).then((response) => response.json())
-    )
-  )
-    .then(() => {
-      loadUsers();
-      loadThreads();
-      showToast('Các luồng đã chọn được bắt đầu thành công', 'success');
-      document.getElementById('selectAllThreads').checked = false;
+  showToast(`⚡ Đang bắt đầu ${selectedThreads.length} luồng...`, 'info');
+
+  // Optimistic UI updates
+  selectedThreads.forEach(id => {
+    const row = document.getElementById('threadRow_' + id);
+    if (row) {
+      const btn = row.querySelector('td:last-child button:first-child');
+      const badge = row.querySelector('td:nth-last-child(2) span.badge');
+      if (btn) {
+        btn.className = 'btn btn-sm btn-warning';
+        btn.innerHTML = '<i class="bi bi-pause-fill"></i>';
+      }
+      if (badge) {
+        badge.className = 'badge bg-primary';
+        badge.innerHTML = '<i class="bi bi-play-circle me-1"></i>Đang chạy';
+      }
+    }
+  });
+
+  // Fast single batch API call
+  fetch('/api/threads/batch-status', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'inprogress', threadIds: selectedThreads })
+  })
+    .then(res => res.json())
+    .then((data) => {
+      if (data.success) {
+        showToast(data.message || 'Các luồng đã chọn được bắt đầu thành công', 'success');
+        document.getElementById('selectAllThreads').checked = false;
+        loadThreads();
+      } else {
+        showToast(data.error || 'Lỗi bắt đầu luồng', 'error');
+        loadThreads();
+      }
     })
     .catch((error) => {
       console.error('Error:', error);
       showToast('Lỗi khi bắt đầu các luồng', 'error');
+      loadThreads();
     });
 }
 
@@ -711,22 +786,46 @@ function pauseSelectedThreads() {
     return;
   }
 
-  Promise.all(
-    selectedThreads.map((id) =>
-      fetch(`/api/threads/${id}/toggle-status`, {
-        method: 'PUT',
-      }).then((response) => response.json())
-    )
-  )
-    .then(() => {
-      loadUsers();
-      loadThreads();
-      showToast('Các luồng đã chọn được tạm dừng thành công', 'success');
-      document.getElementById('selectAllThreads').checked = false;
+  showToast(`⏸️ Đang tạm dừng ${selectedThreads.length} luồng...`, 'info');
+
+  // Optimistic UI updates
+  selectedThreads.forEach(id => {
+    const row = document.getElementById('threadRow_' + id);
+    if (row) {
+      const btn = row.querySelector('td:last-child button:first-child');
+      const badge = row.querySelector('td:nth-last-child(2) span.badge');
+      if (btn) {
+        btn.className = 'btn btn-sm btn-success';
+        btn.innerHTML = '<i class="bi bi-play-fill"></i>';
+      }
+      if (badge) {
+        badge.className = 'badge bg-secondary';
+        badge.innerHTML = '<i class="bi bi-stop-circle me-1"></i>Dừng';
+      }
+    }
+  });
+
+  // Fast single batch API call
+  fetch('/api/threads/batch-status', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'stop', threadIds: selectedThreads })
+  })
+    .then(res => res.json())
+    .then((data) => {
+      if (data.success) {
+        showToast(data.message || 'Các luồng đã chọn được tạm dừng thành công', 'success');
+        document.getElementById('selectAllThreads').checked = false;
+        loadThreads();
+      } else {
+        showToast(data.error || 'Lỗi tạm dừng luồng', 'error');
+        loadThreads();
+      }
     })
     .catch((error) => {
       console.error('Error:', error);
       showToast('Lỗi khi tạm dừng các luồng', 'error');
+      loadThreads();
     });
 }
 
@@ -742,57 +841,63 @@ function deleteSelectedThreads() {
     return;
   }
 
-  if (confirm('Bạn có chắc chắn muốn xóa các luồng đã chọn không?')) {
+  if (confirm(`Bạn có chắc chắn muốn xóa ${selectedThreads.length} luồng đã chọn không?`)) {
+    showToast(`🗑️ Đang xóa ${selectedThreads.length} luồng...`, 'info');
+
+    // Optimistically remove from DOM
+    _cachedThreads = _cachedThreads.filter(t => !selectedThreads.includes(t.id.toString()));
+    renderThreadTable();
+
+    // Call DELETE for each thread
     Promise.all(
-      selectedThreads.map((id) =>
-        fetch(`/api/threads/${id}`, {
-          method: 'DELETE',
-        }).then((response) => response.json())
-      )
+      selectedThreads.map(id => fetch(`/api/threads/${id}`, { method: 'DELETE' }).then(r => r.json()))
     )
       .then(() => {
-        loadUsers();
-        loadThreads();
         showToast('Các luồng đã chọn được xóa thành công', 'success');
         document.getElementById('selectAllThreads').checked = false;
+        loadThreads();
+        loadUsers();
       })
       .catch((error) => {
         console.error('Error:', error);
         showToast('Lỗi khi xóa các luồng', 'error');
+        loadThreads();
       });
   }
 }
 
 function deleteCompletedThreads() {
-  const completedCheckboxes = Array.from(
-    document.querySelectorAll('.thread-checkbox[data-thread-status="done"]')
-  ).filter(cb => parseInt(cb.dataset.threadPending || '0', 10) === 0);
+  const completedThreads = _cachedThreads.filter(
+    t => t.status === 'done' || (t.count_video_upload > 0 && t.videos_uploaded >= t.count_video_upload)
+  );
 
-  const completedIds = completedCheckboxes
-    .map((checkbox) => checkbox.dataset.threadId)
-    .filter((id) => id !== undefined);
-
-  if (completedIds.length === 0) {
-    showToast('Không có luồng nào có trạng thái "Xong" và Pending bằng 0 để xóa', 'warning');
+  if (completedThreads.length === 0) {
+    showToast('Không có luồng nào đã hoàn thành để xóa', 'warning');
     return;
   }
 
-  if (confirm(`Bạn có chắc chắn muốn xóa tất cả ${completedIds.length} luồng có trạng thái "Xong" và số video Pending bằng 0 không?`)) {
+  if (confirm(`Bạn có chắc chắn muốn xóa tất cả ${completedThreads.length} luồng đã hoàn thành không?`)) {
+    showToast(`🗑️ Đang xóa ${completedThreads.length} luồng đã xong...`, 'info');
+
+    const completedIds = completedThreads.map(t => t.id);
+
+    // Optimistically remove completed rows from DOM immediately (0ms response)
+    _cachedThreads = _cachedThreads.filter(t => !completedIds.includes(t.id));
+    renderThreadTable();
+
+    // Delete directly via reliable per-ID deletion
     Promise.all(
-      completedIds.map((id) =>
-        fetch(`/api/threads/${id}`, {
-          method: 'DELETE',
-        }).then((response) => response.json())
-      )
+      completedIds.map(id => fetch(`/api/threads/${id}`, { method: 'DELETE' }).then(r => r.json()))
     )
       .then(() => {
-        loadUsers();
-        loadThreads();
         showToast('Các luồng đã xong được xóa thành công', 'success');
+        loadThreads();
+        loadUsers();
       })
       .catch((error) => {
         console.error('Error:', error);
         showToast('Lỗi khi xóa các luồng đã xong', 'error');
+        loadThreads();
       });
   }
 }
@@ -1376,13 +1481,17 @@ async function startCountryImport() {
   const rows = document.querySelectorAll('.country-import-row');
   
   rows.forEach(row => {
-    const country = row.getAttribute('data-country');
+    let country = row.getAttribute('data-country');
+    if (country === 'custom') {
+      const customInput = row.querySelector('.custom-country-code-input');
+      country = customInput?.value?.trim()?.toLowerCase() || '';
+    }
     const videoFolder = row.querySelector('.video-folder-input')?.value?.trim();
     const driveLink = row.querySelector('.sheet-link-input')?.value?.trim();
     const maxVideosPerAccount = row.querySelector('.max-videos-input')?.value?.trim() || '0';
     const sheetName = row.querySelector('.sheet-name-input')?.value?.trim() || '';
     
-    if (videoFolder && driveLink) {
+    if (videoFolder && driveLink && country) {
       activeImports.push({
         country,
         videoFolder,

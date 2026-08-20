@@ -248,8 +248,8 @@ async function executeImport({ videoFolder, driveLink, delayMin, delayMax, count
               const thread = existingThreads.find(t => t.user_id === userId);
               if (thread) {
                 dbConn.run(
-                  "UPDATE threads SET count_video_upload = count_video_upload + ? WHERE id = ?",
-                  [taskCount, thread.id]
+                  "UPDATE threads SET count_video_upload = count_video_upload + ?, country = ? WHERE id = ?",
+                  [taskCount, targetCountry, thread.id]
                 );
                 // If thread has no proxy set, assign one from dbProxies
                 if (!thread.proxy_host && dbProxies.length > 0) {

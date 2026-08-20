@@ -4,6 +4,7 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const Config = require('../models/config.model');
+const adbService = require('../services/adb.service');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 const db = require('../database/connection').getConnection();
 
@@ -106,7 +107,13 @@ router.post('/crawler-cookies', async (req, res) => {
 router.get('/credit', async (req, res) => {
   try {
     const settings = await Config.getCreditSettings();
-    res.json(settings);
+    res.json({
+      sign_mode: settings.sign_mode || 'credit',
+      credit_url: settings.raw_credit_url || settings.credit_url,
+      credit_key: settings.raw_credit_key || settings.credit_key,
+      phone_sign_url: settings.phone_sign_url || 'http://127.0.0.1:8080',
+      phone_sign_key: settings.phone_sign_key || 'secret_key'
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -115,14 +122,94 @@ router.get('/credit', async (req, res) => {
 // POST /api/config/credit
 router.post('/credit', async (req, res) => {
   try {
-    const { credit_url, credit_key } = req.body;
-    if (!credit_url || !credit_key) {
-      return res.status(400).json({ success: false, message: 'URL và Key không được để trống' });
+    const { credit_url, credit_key, sign_mode = 'credit', phone_sign_url, phone_sign_key } = req.body;
+    if (sign_mode === 'credit' && (!credit_url || !credit_key)) {
+      return res.status(400).json({ success: false, message: 'URL và Key Credit không được để trống' });
     }
-    await Config.updateCreditSettings(credit_url, credit_key);
-    res.json({ success: true, message: 'Lưu cài đặt credit thành công' });
+    if (sign_mode === 'phone' && !phone_sign_url) {
+      return res.status(400).json({ success: false, message: 'URL Phone Sign không được để trống' });
+    }
+    await Config.updateCreditSettings(
+      credit_url || '',
+      credit_key || '',
+      sign_mode,
+      phone_sign_url || 'http://127.0.0.1:8080',
+      phone_sign_key || 'secret_key'
+    );
+    res.json({ success: true, message: 'Lưu cài đặt ký số thành công' });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/config/phone-sign-check
+router.post('/phone-sign-check', async (req, res) => {
+  try {
+    const { phone_sign_url, phone_sign_key } = req.body;
+    const targetUrl = (phone_sign_url || 'http://127.0.0.1:8080').trim().replace(/\/+$/, '') + '/';
+    const testBody = {
+      url: '/api/v2/biz/post/precheck',
+      body: '{}',
+      key: phone_sign_key || 'secret_key'
+    };
+    const startTime = Date.now();
+    const response = await axios.post(targetUrl, testBody, {
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': phone_sign_key || 'secret_key'
+      },
+      timeout: 5000
+    });
+    const latency = Date.now() - startTime;
+    if (response.data?.code === 0 && response.data?.data?.['X-Sap-Access-S']) {
+      return res.json({
+        success: true,
+        latency,
+        data: response.data.data
+      });
+    }
+    res.json({
+      success: false,
+      error: response.data?.msg || 'Server phản hồi nhưng không có chữ ký hợp lệ'
+    });
+  } catch (err) {
+    res.json({
+      success: false,
+      error: err.message || 'Không thể kết nối đến Phone Sign Server'
+    });
+  }
+});
+
+// GET /api/config/adb/devices
+router.get('/adb/devices', async (req, res) => {
+  try {
+    const devices = await adbService.getDevices();
+    const forwards = await adbService.getForwardList();
+    res.json({
+      success: true,
+      devices,
+      forwards
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/config/adb/forward
+router.post('/adb/forward', async (req, res) => {
+  try {
+    const { serial, port = 8080 } = req.body;
+    if (!serial) {
+      return res.status(400).json({ success: false, message: 'Chưa chọn thiết bị' });
+    }
+    const output = await adbService.forwardPort(serial, port, port);
+    res.json({
+      success: true,
+      message: `Đã chuyển tiếp cổng ${port} từ thiết bị [${serial}] sang PC thành công!`,
+      output
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message || 'Lỗi khi forward port qua ADB' });
   }
 });
 

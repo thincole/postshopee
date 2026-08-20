@@ -102,9 +102,17 @@ class User {
 
     static delete(id) {
         return new Promise((resolve, reject) => {
-            db.run('DELETE FROM users WHERE id = ?', [id], (err) => {
-                if (err) return reject(err);
-                resolve();
+            db.serialize(() => {
+                db.run('DELETE FROM video_tasks WHERE user_id = ?', [id], (err1) => {
+                    if (err1) console.error('Error deleting video_tasks for user:', err1);
+                });
+                db.run('DELETE FROM threads WHERE user_id = ?', [id], (err2) => {
+                    if (err2) console.error('Error deleting thread for user:', err2);
+                });
+                db.run('DELETE FROM users WHERE id = ?', [id], (err) => {
+                    if (err) return reject(err);
+                    resolve();
+                });
             });
         });
     }
