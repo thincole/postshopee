@@ -29,6 +29,7 @@ db.run(createTableQuery, [], (err) => {
         if (!hasIsActive) {
             db.run("ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1");
         }
+        db.run("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_unique ON users(LOWER(TRIM(username)));");
     });
 });
 
@@ -52,13 +53,55 @@ class User {
         return new Promise((resolve, reject) => {
             db.run(
                 'INSERT INTO users (username, cookie, proxy, country) VALUES (?, ?, ?, ?)',
-                [username, cookie, proxy || '', country || 'vn'],
+                [username.trim(), cookie.trim(), proxy ? proxy.trim() : '', country ? country.trim().toLowerCase() : 'vn'],
                 function (err) {
                     if (err) return reject(err);
                     resolve(this.lastID);
                 }
             );
         });
+    }
+
+    static async upsert(username, cookie, proxy = '', country = 'vn') {
+        const cleanUser = (username || '').trim();
+        if (!cleanUser) throw new Error('Tên người dùng không được để trống');
+        const cleanCookie = (cookie || '').trim();
+        const cleanProxy = (proxy || '').trim();
+        const cleanCountry = (country || 'vn').trim().toLowerCase();
+
+        const existing = await this.findByUsername(cleanUser);
+        if (existing) {
+            // Cập nhật giá trị mới cho tài khoản đã có sẵn (không tạo thêm dòng mới)
+            const finalProxy = cleanProxy || existing.proxy || '';
+            const finalCountry = cleanCountry || existing.country || 'vn';
+            await new Promise((res, rej) => {
+                db.run(
+                    'UPDATE users SET cookie = ?, proxy = ?, country = ?, is_active = 1 WHERE id = ?',
+                    [cleanCookie, finalProxy, finalCountry, existing.id],
+                    err => err ? rej(err) : res()
+                );
+            });
+
+            // Đồng bộ cập nhật sang bảng threads nếu đã có luồng
+            if (finalProxy) {
+                const parts = finalProxy.split(':');
+                if (parts.length >= 2) {
+                    const host = parts[0];
+                    const port = parseInt(parts[1], 10);
+                    const u = parts.length === 4 ? parts[2] : null;
+                    const p = parts.length === 4 ? parts[3] : null;
+                    db.run(
+                        'UPDATE threads SET proxy_host = ?, proxy_port = ?, proxy_username = ?, proxy_password = ?, country = ?, error = NULL WHERE user_id = ?',
+                        [host, port, u, p, finalCountry, existing.id]
+                    );
+                }
+            }
+            return { id: existing.id, isNew: false };
+        } else {
+            // Tạo mới người dùng nếu chưa từng tồn tại
+            const newId = await this.create(cleanUser, cleanCookie, cleanProxy, cleanCountry);
+            return { id: newId, isNew: true };
+        }
     }
 
     static update(id, username, cookie) {
@@ -118,13 +161,15 @@ class User {
     }
 
     static findByUsername(username) {
+        if (!username) return Promise.resolve(null);
+        const cleanUser = String(username).trim().toLowerCase();
         return new Promise((resolve, reject) => {
             db.all(
                 `SELECT u.*, t.error AS thread_error, t.status AS thread_status 
          FROM users u 
          LEFT JOIN threads t ON u.id = t.user_id 
-         WHERE u.username = ?`,
-                [username],
+         WHERE TRIM(LOWER(u.username)) = ?`,
+                [cleanUser],
                 (err, rows) => {
                     if (err) return reject(err);
                     resolve(rows && rows.length > 0 ? rows[0] : null);

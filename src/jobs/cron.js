@@ -336,14 +336,19 @@ const initJobs = () => {
     }
   }, 2000);
 
-  // Tự động reset tất cả luồng theo lịch cấu hình
+  // Tự động reset và kích hoạt chạy lại tất cả luồng theo lịch cấu hình
   cron.schedule('* * * * *', async () => {
     try {
       const resetTime = await Config.getRunningTimeAgain();
-      const currentTime = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
-      if (currentTime === resetTime) {
+      if (!resetTime) return;
+      const d = new Date();
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mm = String(d.getMinutes()).padStart(2, '0');
+      const currentTime = `${hh}:${mm}`;
+
+      if (currentTime === resetTime.trim()) {
+        console.log(`⏰ [Hẹn Giờ Auto] Đã đến ${resetTime} -> Tự động khởi động và kích hoạt toàn bộ luồng đăng video!`);
         await Thread.resetAllToInprogressThreads();
-        console.log('[cron] All threads reset to inprogress');
       }
     } catch (e) {
       console.error('[cron] Error restarting threads:', e);

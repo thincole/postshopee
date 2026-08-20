@@ -43,18 +43,11 @@ router.post('/import-txt', upload.single('userFile'), async (req, res) => {
 
     for (const item of parsedData) {
       try {
-        const existing = await User.findByUsername(item.username);
-        if (existing) {
-          await Promise.all([
-            User.update(existing.id, item.username, item.cookie),
-            User.updateProxy(existing.id, item.proxy),
-            User.updateCountry(existing.id, item.country),
-            Thread.clearError(existing.id)
-          ]);
-          results.skipped++;
-        } else {
-          await User.create(item.username, item.cookie, item.proxy, item.country);
+        const result = await User.upsert(item.username, item.cookie, item.proxy, item.country);
+        if (result.isNew) {
           results.successful++;
+        } else {
+          results.skipped++;
         }
       } catch (err) {
         console.error('Error importing user ' + item.username + ':', err);
@@ -64,7 +57,7 @@ router.post('/import-txt', upload.single('userFile'), async (req, res) => {
     await fs.unlink(req.file.path);
     res.json({
       success: true,
-      message: 'Nhập người dùng thành công',
+      message: `Nhập thành công: ${results.successful} tài khoản mới, cập nhật giá trị mới cho ${results.skipped} tài khoản đã có sẵn.`,
       results
     });
   } catch (err) {
@@ -77,16 +70,19 @@ router.post('/import-txt', upload.single('userFile'), async (req, res) => {
   }
 });
 
-// POST /
+// POST / (Thêm / Cập nhật người dùng)
 router.post('', async (req, res) => {
   try {
     const { username, cookie, proxy, country } = req.body;
-    const existing = await User.findByUsername(username);
-    if (existing) {
-      return res.status(409).json({ success: false, message: 'Tên người dùng đã tồn tại' });
+    if (!username || !username.trim()) {
+      return res.status(400).json({ success: false, message: 'Tên người dùng không được để trống' });
     }
-    await User.create(username, cookie, proxy, country || 'vn');
-    res.status(201).json({ success: true, message: 'Tạo người dùng thành công' });
+    const result = await User.upsert(username, cookie, proxy, country || 'vn');
+    if (result.isNew) {
+      res.status(201).json({ success: true, message: 'Tạo người dùng thành công' });
+    } else {
+      res.status(200).json({ success: true, message: 'Tài khoản đã tồn tại - Đã cập nhật Cookie & Proxy mới thành công!' });
+    }
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -205,25 +201,18 @@ router.post('/import-json', upload.single('userJsonFile'), async (req, res) => {
 
     for (const item of items) {
       if (!item.username || !item.cookie) continue;
-      const existing = await User.findByUsername(item.username);
-      if (existing) {
-        await Promise.all([
-          User.update(existing.id, item.username, item.cookie),
-          User.updateProxy(existing.id, item.proxy || ''),
-          User.updateCountry(existing.id, item.country || defaultCountry),
-          Thread.clearError(existing.id)
-        ]);
-        updated++;
-      } else {
-        await User.create(item.username, item.cookie, item.proxy || '', item.country || defaultCountry);
+      const result = await User.upsert(item.username, item.cookie, item.proxy || '', item.country || defaultCountry);
+      if (result.isNew) {
         added++;
+      } else {
+        updated++;
       }
     }
 
     await fs.unlink(req.file.path);
     res.json({
       success: true,
-      message: 'Nhập thành công ' + added + ' tài khoản mới, cập nhật ' + updated + ' tài khoản.'
+      message: 'Nhập thành công ' + added + ' tài khoản mới, cập nhật ' + updated + ' tài khoản đã có.'
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

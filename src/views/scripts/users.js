@@ -54,16 +54,35 @@ function saveUserCountry(userId, country, selectEl) {
     .catch(() => showToast('Lỗi kết nối', 'error'));
 }
 
+let _userCurrentPage = 1;
+let _userPageSize = 50;
+
+function onUserFilterChange() {
+  _userCurrentPage = 1;
+  filterUsers();
+}
+
+function onUserPageSizeChange(newSize) {
+  _userPageSize = parseInt(newSize, 10) || 50;
+  _userCurrentPage = 1;
+  filterUsers();
+}
+
+function setUserPage(page) {
+  _userCurrentPage = page;
+  filterUsers();
+}
+
 function filterUsers() {
   const searchInput = document.getElementById('userSearchInput');
   const countryFilter = document.getElementById('userCountryFilter');
   const query = (searchInput ? searchInput.value : '').trim().toLowerCase();
   const selectedCountry = countryFilter ? countryFilter.value : 'all';
 
-  const rows = document.querySelectorAll('#userTableBody tr.user-row');
-  let visibleCount = 0;
-
-  rows.forEach((row) => {
+  const rows = Array.from(document.querySelectorAll('#userTableBody tr.user-row'));
+  
+  // 1. Lọc theo quốc gia và từ khóa tìm kiếm
+  const matchedRows = rows.filter((row) => {
     const country = (row.dataset.country || 'vn').toLowerCase();
     const username = (row.dataset.username || '').toLowerCase();
     const proxy = (row.dataset.proxy || '').toLowerCase();
@@ -72,22 +91,48 @@ function filterUsers() {
     const matchCountry = selectedCountry === 'all' || country === selectedCountry;
     const matchQuery = !query || username.includes(query) || proxy.includes(query) || cookie.includes(query);
 
-    if (matchCountry && matchQuery) {
+    return matchCountry && matchQuery;
+  });
+
+  const totalFiltered = matchedRows.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / _userPageSize));
+  if (_userCurrentPage > totalPages) _userCurrentPage = totalPages;
+
+  const startIdx = (_userCurrentPage - 1) * _userPageSize;
+  const endIdx = startIdx + _userPageSize;
+  const pageRows = matchedRows.slice(startIdx, endIdx);
+  const pageRowsSet = new Set(pageRows);
+
+  // 2. Ẩn/hiện và đánh số thứ tự
+  let pageIndex = 0;
+  rows.forEach((row) => {
+    if (pageRowsSet.has(row)) {
       row.classList.remove('d-none');
-      visibleCount++;
       const indexCell = row.querySelector('.user-index');
-      if (indexCell) indexCell.textContent = visibleCount;
+      if (indexCell) indexCell.textContent = startIdx + pageIndex + 1;
+      pageIndex++;
     } else {
       row.classList.add('d-none');
     }
   });
 
+  // 3. Cập nhật nhãn tổng số
   const summaryBadge = document.getElementById('userCountSummary');
   if (summaryBadge) {
-    if (selectedCountry === 'all' && !query) {
-      summaryBadge.textContent = `Tổng: ${rows.length} tài khoản`;
+    summaryBadge.textContent = `Hiển thị ${pageRows.length}/${totalFiltered} (Tổng ${rows.length} tài khoản)`;
+  }
+
+  // 4. Cập nhật nút phân trang
+  const navContainer = document.getElementById('userPaginationControls');
+  if (navContainer) {
+    if (totalPages <= 1) {
+      navContainer.innerHTML = '';
     } else {
-      summaryBadge.textContent = `Hiển thị: ${visibleCount} / ${rows.length} tài khoản`;
+      let pageBtns = '';
+      pageBtns += `<button class="btn btn-sm btn-outline-secondary ${ _userCurrentPage <= 1 ? 'disabled' : '' }" onclick="setUserPage(${_userCurrentPage - 1})"><i class="bi bi-chevron-left"></i></button>`;
+      pageBtns += `<span class="small px-2 fw-semibold">Trang ${_userCurrentPage} / ${totalPages}</span>`;
+      pageBtns += `<button class="btn btn-sm btn-outline-secondary ${ _userCurrentPage >= totalPages ? 'disabled' : '' }" onclick="setUserPage(${_userCurrentPage + 1})"><i class="bi bi-chevron-right"></i></button>`;
+      navContainer.innerHTML = pageBtns;
     }
   }
 }
@@ -426,9 +471,15 @@ document.addEventListener('DOMContentLoaded', () => {
       .catch(() => showToast('Lỗi nhập JSON', 'error'));
   });
 
-  // Initialize delete button event listeners
+  // Initialize delete button event listeners and initial pagination
   updateUserTableDeleteButtons();
+  filterUsers();
 });
+
+// Run initial filter and pagination
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  filterUsers();
+}
 
 function assignRandomProxies() {
   const selectedCheckboxes = document.querySelectorAll('.user-checkbox:checked');
