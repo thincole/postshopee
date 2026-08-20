@@ -1,4 +1,5 @@
 const cron = require('node-cron');
+const fs = require('fs');
 const db = require('../database/connection').getConnection();
 const VideoTask = require('../models/video.model');
 const { processLocalVideoUpload } = require('../services/handle-upload.service');
@@ -88,6 +89,22 @@ const initJobs = () => {
   updateDynamicConcurrency();
   setInterval(updateDynamicConcurrency, 30000); // Tự động đồng bộ mỗi 30s khi bạn thêm/bớt Proxy
 
+  // Tự động bỏ qua các task bị kẹt ở trạng thái 'uploading' quá 5 phút (300s)
+  const cleanStuckUploadingTasks = () => {
+    db.run(
+      `UPDATE video_tasks 
+       SET status = 'failed', error = 'Kẹt upload quá 5 phút (tự động bỏ qua)' 
+       WHERE status = 'uploading' AND (strftime('%s', 'now', 'localtime') - strftime('%s', created_at)) > 300`,
+      (err) => {
+        if (!err) {
+          // Xóa các luồng bị kẹt khỏi activeThreadIds nếu có
+        }
+      }
+    );
+  };
+  cleanStuckUploadingTasks();
+  setInterval(cleanStuckUploadingTasks, 15000); // Tự động quét mỗi 15 giây
+
   // Lặp kiểm tra và kích hoạt upload mỗi 2 giây
   setInterval(async () => {
     try {
@@ -136,11 +153,26 @@ const initJobs = () => {
             );
             if (!threadCheck || threadCheck.status !== 'inprogress') return;
 
-            // Lấy task pending tiếp theo của tài khoản
-            const task = await VideoTask.getNextPendingForUser(t.user_id);
+            // Lấy task pending tiếp theo của tài khoản và tự động bỏ qua ngay các file bị thiếu
+            let task = null;
+            while (true) {
+              const nextTask = await VideoTask.getNextPendingForUser(t.user_id);
+              if (!nextTask) break;
+
+              // Kiểm tra xem file video có thực sự tồn tại trên ổ đĩa không
+              if (!nextTask.video_path || !fs.existsSync(nextTask.video_path)) {
+                // Tự động bỏ qua file thiếu trong 1ms và không ghi lỗi lên luồng
+                await VideoTask.updateStatus(nextTask.id, 'failed', { error: 'File video không tồn tại trên ổ đĩa (đã xóa)' });
+                continue; // Tìm ngay file tiếp theo
+              }
+
+              task = nextTask;
+              break;
+            }
+
             if (!task) {
               await new Promise((res, rej) =>
-                db.run("UPDATE threads SET status = 'done' WHERE id = ?", [t.id], err => err ? rej(err) : res())
+                db.run("UPDATE threads SET status = 'done', error = NULL WHERE id = ?", [t.id], err => err ? rej(err) : res())
               );
               return;
             }
@@ -212,29 +244,71 @@ const initJobs = () => {
                 }
                 errMsg = errMsg.substring(0, 200);
               }
+              const lowerErr = (typeof errMsg === 'string' ? errMsg : '').toLowerCase();
 
-              // Đếm số lần lỗi liên tiếp của luồng này
-              const fails = (consecutiveFailures.get(t.id) || 0) + 1;
-              consecutiveFailures.set(t.id, fails);
+              // 1. TỰ ĐỘNG DỪNG LUỒNG KHI SHOPEE GIỚI HẠN SỐ LƯỢNG ĐĂNG TRONG NGÀY
+              const isPostLimitReached = 
+                lowerErr.includes('post too many videos') || 
+                lowerErr.includes('have a rest') || 
+                lowerErr.includes('too many videos') ||
+                lowerErr.includes('frequently');
 
-              // TỰ ĐỘNG ĐỔI PROXY KHI PHÁT HIỆN PROXY ĐÃ CHẾT THỰC SỰ:
-              // 1. Lỗi 407 (Proxy hết hạn gói / sai pass)
-              // 2. Lỗi ECONNREFUSED (Server proxy sập kết nối)
-              // 3. Hoặc luồng này bị lỗi proxy liên tiếp >= 3 lần
-              const isHardProxyDead = errMsg.includes('407') || errMsg.includes('ECONNREFUSED') || errMsg.includes('ETIMEDOUT');
-              let autoChanged = false;
-
-              if (isHardProxyDead && fails >= 2) {
-                await rotateThreadProxy(t.id, `${errMsg} (phát hiện chết liên tiếp ${fails} lần)`);
+              if (isPostLimitReached) {
+                console.log(`[Shopee-Limit] Tài khoản ${t.username} (Luồng #${t.id}) đã bị Shopee giới hạn số lượng video trong ngày -> Tự động dừng luồng.`);
                 consecutiveFailures.delete(t.id);
-                autoChanged = true;
-              } else if (fails >= 3) {
-                await rotateThreadProxy(t.id, `Lỗi liên tiếp ${fails} lần: ${errMsg}`);
-                consecutiveFailures.delete(t.id);
-                autoChanged = true;
+                await Promise.all([
+                  VideoTask.updateStatus(task.id, 'failed', { error: 'Shopee giới hạn: Post too many videos, please have a rest' }),
+                  Log.create({
+                    username: t.username,
+                    status: 'error',
+                    error: `[Tự Động Dừng Luồng] Đã đạt giới hạn đăng video của Shopee trong ngày (${errMsg})`,
+                    failed_function: 'createPost'
+                  }),
+                  new Promise((res, rej) =>
+                    db.run(
+                      "UPDATE threads SET status = 'stop', error = ? WHERE id = ?",
+                      ['Shopee giới hạn: Post too many videos (Đã dừng luồng)', t.id],
+                      err => err ? rej(err) : res()
+                    )
+                  )
+                ]);
+                return;
               }
 
-              const delayAfterError = autoChanged ? 8 : 30;
+              // Phân loại lỗi: Lỗi file cục bộ vs Lỗi mạng Proxy
+              const isFileError = 
+                errMsg.includes('ENOENT') || 
+                errMsg.includes('no such file') || 
+                errMsg.includes('File video không tồn tại') || 
+                errMsg.includes('không tồn tại hoặc rỗng');
+
+              let autoChanged = false;
+              let delayAfterError = 30;
+
+              if (isFileError) {
+                // LỖI THIẾU FILE: Tuyệt đối KHÔNG đổi proxy, bỏ qua task này và nhảy sang video kế tiếp sau 5s
+                delayAfterError = 5;
+              } else {
+                // Đếm số lần lỗi mạng liên tiếp của luồng này
+                const fails = (consecutiveFailures.get(t.id) || 0) + 1;
+                consecutiveFailures.set(t.id, fails);
+
+                // Chỉ tự động đổi proxy khi đúng là Proxy bị chết mạng (407, ECONNREFUSED) liên tiếp
+                const isHardProxyDead = errMsg.includes('407') || errMsg.includes('ECONNREFUSED') || errMsg.includes('ETIMEDOUT');
+
+                if (isHardProxyDead && fails >= 2) {
+                  await rotateThreadProxy(t.id, `${errMsg} (phát hiện chết liên tiếp ${fails} lần)`);
+                  consecutiveFailures.delete(t.id);
+                  autoChanged = true;
+                  delayAfterError = 8;
+                } else if (fails >= 3 && isHardProxyDead) {
+                  await rotateThreadProxy(t.id, `Lỗi mạng proxy liên tiếp ${fails} lần: ${errMsg}`);
+                  consecutiveFailures.delete(t.id);
+                  autoChanged = true;
+                  delayAfterError = 8;
+                }
+              }
+
               const nextRetryTime = Math.floor(Date.now() / 1000) + delayAfterError;
 
               await Promise.all([
