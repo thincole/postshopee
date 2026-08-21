@@ -93,7 +93,7 @@ class UpdaterService {
           };
         }
       } catch (releaseErr) {
-        console.error('Failed to fetch commit or release info:', releaseErr.message);
+        // Repository ở chế độ Private hoặc không có token truy cập công khai
       }
 
       return {
