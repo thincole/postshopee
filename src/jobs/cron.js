@@ -7,7 +7,7 @@ const Log = require('../models/log.model');
 const Thread = require('../models/thread.model');
 const Config = require('../models/config.model');
 
-// Helper tự động đổi sang Proxy sống mới khi phát hiện Proxy cũ chết hẳn
+// Helper tự động đổi sang Proxy sống mới khi phát hiện Proxy cũ chết hoặc bị chặn
 async function rotateThreadProxy(threadId, reason = '') {
   return new Promise((resolve) => {
     db.all("SELECT proxy FROM proxies ORDER BY RANDOM() LIMIT 5", [], (err, rows) => {
@@ -20,11 +20,16 @@ async function rotateThreadProxy(threadId, reason = '') {
         const user = parts.length === 4 ? parts[2].trim() : null;
         const pass = parts.length === 4 ? parts[3].trim() : null;
         db.run(
-          "UPDATE threads SET proxy_host = ?, proxy_port = ?, proxy_username = ?, proxy_password = ? WHERE id = ?",
+          "UPDATE threads SET proxy_host = ?, proxy_port = ?, proxy_username = ?, proxy_password = ?, error = NULL WHERE id = ?",
           [host, port, user, pass, threadId],
           (uErr) => {
             if (!uErr) {
               console.log(`🔄 [Auto-Proxy] Luồng #${threadId} đã tự đổi sang proxy mới: ${host}:${port} (Lý do: ${reason})`);
+              // Đồng bộ lưu proxy mới này vào bảng users để các phiên làm việc sau vẫn dùng proxy này
+              db.run(
+                "UPDATE users SET proxy = ? WHERE id = (SELECT user_id FROM threads WHERE id = ?)",
+                [chosen, threadId]
+              );
             }
             resolve(chosen);
           }
@@ -289,23 +294,41 @@ const initJobs = () => {
                 // LỖI THIẾU FILE: Tuyệt đối KHÔNG đổi proxy, bỏ qua task này và nhảy sang video kế tiếp sau 5s
                 delayAfterError = 5;
               } else {
-                // Đếm số lần lỗi mạng liên tiếp của luồng này
-                const fails = (consecutiveFailures.get(t.id) || 0) + 1;
-                consecutiveFailures.set(t.id, fails);
+                // Nhận diện toàn diện các dạng lỗi do Proxy (chết kết nối, từ chối, token rỗng, time out...)
+                const isProxyError = 
+                  errMsg.includes('ECONNREFUSED') ||
+                  errMsg.includes('ETIMEDOUT') ||
+                  errMsg.includes('ECONNRESET') ||
+                  errMsg.includes('EHOSTUNREACH') ||
+                  errMsg.includes('ENOTFOUND') ||
+                  errMsg.includes('407') ||
+                  errMsg.includes('không kết nối được') ||
+                  errMsg.includes('Empty token response') ||
+                  errMsg.includes('getToken failed') ||
+                  errMsg.includes('getUploadInfo failed') ||
+                  errMsg.includes('socket hang up') ||
+                  errMsg.includes('Proxy connection timed out') ||
+                  errMsg.includes('ERR_BAD_REQUEST');
 
-                // Chỉ tự động đổi proxy khi đúng là Proxy bị chết mạng (407, ECONNREFUSED) liên tiếp
-                const isHardProxyDead = errMsg.includes('407') || errMsg.includes('ECONNREFUSED') || errMsg.includes('ETIMEDOUT');
-
-                if (isHardProxyDead && fails >= 2) {
-                  await rotateThreadProxy(t.id, `${errMsg} (phát hiện chết liên tiếp ${fails} lần)`);
-                  consecutiveFailures.delete(t.id);
-                  autoChanged = true;
-                  delayAfterError = 8;
-                } else if (fails >= 3 && isHardProxyDead) {
-                  await rotateThreadProxy(t.id, `Lỗi mạng proxy liên tiếp ${fails} lần: ${errMsg}`);
-                  consecutiveFailures.delete(t.id);
-                  autoChanged = true;
-                  delayAfterError = 8;
+                if (isProxyError) {
+                  const newProxy = await rotateThreadProxy(t.id, errMsg);
+                  if (newProxy) {
+                    autoChanged = true;
+                    delayAfterError = 5; // Thử lại ngay sau 5 giây với proxy mới
+                    consecutiveFailures.delete(t.id);
+                  }
+                } else {
+                  // Đếm số lần lỗi khác liên tiếp của luồng này
+                  const fails = (consecutiveFailures.get(t.id) || 0) + 1;
+                  consecutiveFailures.set(t.id, fails);
+                  if (fails >= 2) {
+                    const newProxy = await rotateThreadProxy(t.id, `Lỗi lặp lại ${fails} lần: ${errMsg}`);
+                    if (newProxy) {
+                      autoChanged = true;
+                      delayAfterError = 5;
+                      consecutiveFailures.delete(t.id);
+                    }
+                  }
                 }
               }
 
@@ -316,11 +339,15 @@ const initJobs = () => {
                 Log.create({
                   username: t.username,
                   status: 'error',
-                  error: autoChanged ? `[Tự Đổi Proxy Do Chết] ${errMsg}` : errMsg,
+                  error: autoChanged ? `[Tự Đổi Proxy Sống Mới] ${errMsg}` : errMsg,
                   failed_function: uploadErr?.failedFunction || 'uploadShopeeVideo'
                 }),
                 new Promise((res, rej) =>
-                  db.run("UPDATE threads SET error = ?, next_run_at = ? WHERE id = ?", [errMsg, nextRetryTime, t.id], err => err ? rej(err) : res())
+                  db.run(
+                    "UPDATE threads SET error = ?, next_run_at = ? WHERE id = ?",
+                    [autoChanged ? null : errMsg, nextRetryTime, t.id],
+                    err => err ? rej(err) : res()
+                  )
                 )
               ]);
             }

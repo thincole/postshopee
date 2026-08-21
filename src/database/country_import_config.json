@@ -12,14 +12,14 @@
       "videoFolder": "G:\\My Drive\\Video AI\\",
       "driveLink": "https://docs.google.com/spreadsheets/d/18OE86tzWPeKp3xlSYscmJFEQC87ZBuBwgTF8HOz8e1w/edit?gid=623566425#gid=623566425",
       "sheetName": "PH",
-      "maxVideosPerAccount": "59",
+      "maxVideosPerAccount": "30",
       "isAigc": true
     },
     "id": {
       "videoFolder": "G:\\My Drive\\Video AI\\",
       "driveLink": "https://docs.google.com/spreadsheets/d/18OE86tzWPeKp3xlSYscmJFEQC87ZBuBwgTF8HOz8e1w/edit?usp=sharing",
       "sheetName": "ID",
-      "maxVideosPerAccount": "20",
+      "maxVideosPerAccount": "80",
       "isAigc": true
     },
     "custom": {
@@ -33,7 +33,7 @@
   "general": {
     "delayMin": "68",
     "delayMax": "102",
-    "autoStart": false,
+    "autoStart": true,
     "deleteOnSuccess": true
   }
 }
