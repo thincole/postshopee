@@ -75,16 +75,14 @@ function parseProxyHelper(thread) {
 }
 
 const initJobs = () => {
-  // Bộ theo dõi các luồng đang thực thi song song
   const activeThreadIds = new Set();
-  const consecutiveFailures = new Map(); // Theo dõi số lần lỗi liên tiếp của từng luồng
-  let maxConcurrent = 60; // Tự động tính: Số Proxy x 2
+  const consecutiveFailures = new Map();
+  let maxConcurrent = 60;
 
-  // Cập nhật giới hạn số luồng upload động theo số lượng Proxy trong database (Số Proxy x 2)
   const updateDynamicConcurrency = () => {
     db.get("SELECT COUNT(*) as count FROM proxies", [], (err, row) => {
       if (!err && row && row.count > 0) {
-        maxConcurrent = row.count * 2; // Công thức: Số Proxy x 2
+        maxConcurrent = row.count * 2;
       } else {
         maxConcurrent = 20;
       }
@@ -92,278 +90,250 @@ const initJobs = () => {
   };
 
   updateDynamicConcurrency();
-  setInterval(updateDynamicConcurrency, 30000); // Tự động đồng bộ mỗi 30s khi bạn thêm/bớt Proxy
+  setInterval(updateDynamicConcurrency, 30000);
 
-  // Tự động bỏ qua các task bị kẹt ở trạng thái 'uploading' quá 5 phút (300s)
   const cleanStuckUploadingTasks = () => {
     db.run(
       `UPDATE video_tasks 
        SET status = 'failed', error = 'Kẹt upload quá 5 phút (tự động bỏ qua)' 
        WHERE status = 'uploading' AND (strftime('%s', 'now', 'localtime') - strftime('%s', created_at)) > 300`,
-      (err) => {
-        if (!err) {
-          // Xóa các luồng bị kẹt khỏi activeThreadIds nếu có
-        }
-      }
+      () => {}
     );
   };
   cleanStuckUploadingTasks();
-  setInterval(cleanStuckUploadingTasks, 15000); // Tự động quét mỗi 15 giây
+  setInterval(cleanStuckUploadingTasks, 15000);
 
-  // Lặp kiểm tra và kích hoạt upload mỗi 2 giây
-  setInterval(async () => {
+  async function executeThread(t) {
+    try {
+      if (t.count_video_upload > 0 && t.videos_uploaded >= t.count_video_upload) {
+        await new Promise((res) => db.run("UPDATE threads SET status = 'done' WHERE id = ?", [t.id], () => res()));
+        return;
+      }
+
+      const threadCheck = await new Promise((res) =>
+        db.get("SELECT status FROM threads WHERE id = ?", [t.id], (err, row) => res(row))
+      );
+      if (!threadCheck || threadCheck.status !== 'inprogress') return;
+
+      let task = null;
+      while (true) {
+        const nextTask = await VideoTask.getNextPendingForUser(t.user_id);
+        if (!nextTask) break;
+
+        if (!nextTask.video_path || !fs.existsSync(nextTask.video_path)) {
+          await VideoTask.updateStatus(nextTask.id, 'failed', { error: 'File video không tồn tại trên ổ đĩa (đã xóa)' });
+          continue;
+        }
+
+        task = nextTask;
+        break;
+      }
+
+      if (!task) {
+        await new Promise((res) => db.run("UPDATE threads SET status = 'done', error = NULL WHERE id = ?", [t.id], () => res()));
+        return;
+      }
+
+      await VideoTask.updateStatus(task.id, 'uploading');
+      const proxyObj = parseProxyHelper(t);
+
+      try {
+        const result = await processLocalVideoUpload(task.video_path, {
+          cookie: t.cookie,
+          proxy: proxyObj,
+          caption: task.caption,
+          products: task.products,
+          country: t.country || 'vn'
+        });
+
+        consecutiveFailures.delete(t.id);
+        await new Promise((res) => db.run("UPDATE threads SET error = NULL WHERE id = ?", [t.id], () => res()));
+
+        const minDelay = t.delay_min || 60;
+        const maxDelay = t.delay_max || 180;
+        const randomDelay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+        const nextRunTime = Math.floor(Date.now() / 1000) + randomDelay;
+
+        await Promise.all([
+          VideoTask.updateStatus(task.id, 'completed', {
+            post_id: result.postId,
+            video_link: result.videoLink
+          }),
+          Log.create({
+            username: t.username,
+            status: 'success',
+            post_id: result.postId,
+            extra_info: JSON.stringify({ video: task.video_filename, link: result.videoLink })
+          }),
+          new Promise((res) => {
+            db.run(
+              "UPDATE threads SET videos_uploaded = videos_uploaded + 1, next_run_at = ? WHERE id = ?",
+              [nextRunTime, t.id],
+              () => {
+                if (t.count_video_upload > 0 && (t.videos_uploaded + 1) >= t.count_video_upload) {
+                  db.run("UPDATE threads SET status = 'done' WHERE id = ?", [t.id], () => res());
+                } else {
+                  res();
+                }
+              }
+            );
+          })
+        ]);
+      } catch (uploadErr) {
+        let errMsg = uploadErr?.error || uploadErr?.message || 'Unknown error';
+        if (typeof errMsg === 'string') {
+          if (errMsg.includes('<!DOCTYPE') || errMsg.includes('<html')) {
+            errMsg = 'Credit API server không phản hồi — kiểm tra kết nối';
+          }
+          errMsg = errMsg.substring(0, 200);
+        }
+        const lowerErr = (typeof errMsg === 'string' ? errMsg : '').toLowerCase();
+
+        const isPostLimitReached = 
+          lowerErr.includes('post too many videos') || 
+          lowerErr.includes('have a rest') || 
+          lowerErr.includes('too many videos') ||
+          lowerErr.includes('frequently');
+
+        if (isPostLimitReached) {
+          console.log(`[Shopee-Limit] Tài khoản ${t.username} (Luồng #${t.id}) đã bị Shopee giới hạn số lượng video trong ngày -> Tự động dừng luồng.`);
+          consecutiveFailures.delete(t.id);
+          await Promise.all([
+            VideoTask.updateStatus(task.id, 'failed', { error: 'Shopee giới hạn: Post too many videos, please have a rest' }),
+            Log.create({
+              username: t.username,
+              status: 'error',
+              error: `[Tự Động Dừng Luồng] Đã đạt giới hạn đăng video của Shopee trong ngày (${errMsg})`,
+              failed_function: 'createPost'
+            }),
+            new Promise((res) =>
+              db.run(
+                "UPDATE threads SET status = 'stop', error = ? WHERE id = ?",
+                ['Shopee giới hạn: Post too many videos (Đã dừng luồng)', t.id],
+                () => res()
+              )
+            )
+          ]);
+          return;
+        }
+
+        const isFileError = 
+          errMsg.includes('ENOENT') || 
+          errMsg.includes('no such file') || 
+          errMsg.includes('File video không tồn tại') || 
+          errMsg.includes('không tồn tại hoặc rỗng');
+
+        let autoChanged = false;
+        let delayAfterError = 30;
+
+        if (isFileError) {
+          delayAfterError = 5;
+        } else {
+          const isProxyError = 
+            errMsg.includes('ECONNREFUSED') ||
+            errMsg.includes('ETIMEDOUT') ||
+            errMsg.includes('ECONNRESET') ||
+            errMsg.includes('EHOSTUNREACH') ||
+            errMsg.includes('ENOTFOUND') ||
+            errMsg.includes('407') ||
+            errMsg.includes('không kết nối được') ||
+            errMsg.includes('Empty token response') ||
+            errMsg.includes('getToken failed') ||
+            errMsg.includes('getUploadInfo failed') ||
+            errMsg.includes('socket hang up') ||
+            errMsg.includes('Proxy connection timed out') ||
+            errMsg.includes('ERR_BAD_REQUEST');
+
+          if (isProxyError) {
+            const newProxy = await rotateThreadProxy(t.id, errMsg);
+            if (newProxy) {
+              autoChanged = true;
+              delayAfterError = 5;
+              consecutiveFailures.delete(t.id);
+            }
+          } else {
+            const fails = (consecutiveFailures.get(t.id) || 0) + 1;
+            consecutiveFailures.set(t.id, fails);
+            if (fails >= 2) {
+              const newProxy = await rotateThreadProxy(t.id, `Lỗi lặp lại ${fails} lần: ${errMsg}`);
+              if (newProxy) {
+                autoChanged = true;
+                delayAfterError = 5;
+                consecutiveFailures.delete(t.id);
+              }
+            }
+          }
+        }
+
+        const nextRetryTime = Math.floor(Date.now() / 1000) + delayAfterError;
+
+        await Promise.all([
+          VideoTask.updateStatus(task.id, 'failed', { error: errMsg }),
+          Log.create({
+            username: t.username,
+            status: 'error',
+            error: autoChanged ? `[Tự Đổi Proxy Sống Mới] ${errMsg}` : errMsg,
+            failed_function: uploadErr?.failedFunction || 'uploadShopeeVideo'
+          }),
+          new Promise((res) =>
+            db.run(
+              "UPDATE threads SET error = ?, next_run_at = ? WHERE id = ?",
+              [autoChanged ? null : errMsg, nextRetryTime, t.id],
+              () => res()
+            )
+          )
+        ]);
+      }
+    } catch (thErr) {
+      console.error(`[cron] Luồng #${t.id} gặp lỗi:`, thErr);
+    } finally {
+      activeThreadIds.delete(t.id);
+    }
+  }
+
+  let isChecking = false;
+  async function checkQueue() {
+    if (isChecking) return;
+    isChecking = true;
     try {
       const nowSec = Math.floor(Date.now() / 1000);
       const availableSlots = maxConcurrent - activeThreadIds.size;
-      if (availableSlots <= 0) return;
+      if (availableSlots > 0) {
+        const threads = await new Promise((resolve) => {
+          db.all(
+            `SELECT threads.*, users.cookie, users.username, users.proxy AS user_proxy
+             FROM threads
+             INNER JOIN users ON threads.user_id = users.id
+             WHERE threads.status = 'inprogress'`,
+            [],
+            (err, rows) => resolve(rows || [])
+          );
+        });
 
-      // Lấy danh sách các luồng đang chạy
-      const threads = await new Promise((resolve, reject) => {
-        db.all(
-          `SELECT threads.*, users.cookie, users.username, users.proxy AS user_proxy
-           FROM threads
-           INNER JOIN users ON threads.user_id = users.id
-           WHERE threads.status = 'inprogress'`,
-          [],
-          (err, rows) => err ? reject(err) : resolve(rows || [])
+        const runnableThreads = (threads || []).filter(
+          t => (t.next_run_at || 0) <= nowSec && !activeThreadIds.has(t.id)
         );
-      });
 
-      // Lọc các luồng đã đến giờ chạy và chưa có trong hàng đợi đang upload
-      const runnableThreads = threads.filter(
-        t => (t.next_run_at || 0) <= nowSec && !activeThreadIds.has(t.id)
-      );
-      if (runnableThreads.length === 0) return;
-
-      // Stagger thread launches (50ms gap) to avoid event loop starvation
-      const toRun = runnableThreads.slice(0, availableSlots);
-      for (let i = 0; i < toRun.length; i++) {
-        const t = toRun[i];
-        activeThreadIds.add(t.id);
-
-        // Chạy bất đồng bộ từng luồng độc lập
-        (async () => {
-          try {
-            // Kiểm tra giới hạn số lượng video của luồng
-            if (t.count_video_upload > 0 && t.videos_uploaded >= t.count_video_upload) {
-              await new Promise((res, rej) =>
-                db.run("UPDATE threads SET status = 'done' WHERE id = ?", [t.id], err => err ? rej(err) : res())
-              );
-              return;
-            }
-
-            // Kiểm tra lại trạng thái luồng trong DB
-            const threadCheck = await new Promise((res, rej) =>
-              db.get("SELECT status FROM threads WHERE id = ?", [t.id], (err, row) => err ? rej(err) : res(row))
-            );
-            if (!threadCheck || threadCheck.status !== 'inprogress') return;
-
-            // Lấy task pending tiếp theo của tài khoản và tự động bỏ qua ngay các file bị thiếu
-            let task = null;
-            while (true) {
-              const nextTask = await VideoTask.getNextPendingForUser(t.user_id);
-              if (!nextTask) break;
-
-              // Kiểm tra xem file video có thực sự tồn tại trên ổ đĩa không
-              if (!nextTask.video_path || !fs.existsSync(nextTask.video_path)) {
-                // Tự động bỏ qua file thiếu trong 1ms và không ghi lỗi lên luồng
-                await VideoTask.updateStatus(nextTask.id, 'failed', { error: 'File video không tồn tại trên ổ đĩa (đã xóa)' });
-                continue; // Tìm ngay file tiếp theo
-              }
-
-              task = nextTask;
-              break;
-            }
-
-            if (!task) {
-              await new Promise((res, rej) =>
-                db.run("UPDATE threads SET status = 'done', error = NULL WHERE id = ?", [t.id], err => err ? rej(err) : res())
-              );
-              return;
-            }
-
-            // Đánh dấu task đang upload
-            await VideoTask.updateStatus(task.id, 'uploading');
-
-            // Phân tích proxy (Cố định theo đúng cấu hình của luồng/tài khoản)
-            const proxyObj = parseProxyHelper(t);
-
-            try {
-              // Xử lý upload video trực tiếp
-              const result = await processLocalVideoUpload(task.video_path, {
-                cookie: t.cookie,
-                proxy: proxyObj,
-                caption: task.caption,
-                products: task.products,
-                country: t.country || 'vn'
-              });
-
-              // Reset bộ đếm lỗi của luồng khi post thành công
-              consecutiveFailures.delete(t.id);
-
-              // Xóa lỗi cũ của luồng
-              await new Promise((res, rej) =>
-                db.run("UPDATE threads SET error = NULL WHERE id = ?", [t.id], err => err ? rej(err) : res())
-              );
-
-              // Cập nhật kết quả thành công
-              const minDelay = t.delay_min || 60;
-              const maxDelay = t.delay_max || 180;
-              const randomDelay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
-              const nextRunTime = Math.floor(Date.now() / 1000) + randomDelay;
-
-              await Promise.all([
-                VideoTask.updateStatus(task.id, 'completed', {
-                  post_id: result.postId,
-                  video_link: result.videoLink
-                }),
-                Log.create({
-                  username: t.username,
-                  status: 'success',
-                  post_id: result.postId,
-                  extra_info: JSON.stringify({ video: task.video_filename, link: result.videoLink })
-                }),
-                new Promise((res, rej) => {
-                  db.run(
-                    "UPDATE threads SET videos_uploaded = videos_uploaded + 1, next_run_at = ? WHERE id = ?",
-                    [nextRunTime, t.id],
-                    (err) => {
-                      if (err) return rej(err);
-                      if (t.count_video_upload > 0 && (t.videos_uploaded + 1) >= t.count_video_upload) {
-                        db.run("UPDATE threads SET status = 'done' WHERE id = ?", [t.id], (err2) => {
-                          if (err2) return rej(err2);
-                          res();
-                        });
-                      } else {
-                        res();
-                      }
-                    }
-                  );
-                })
-              ]);
-            } catch (uploadErr) {
-              let errMsg = uploadErr?.error || uploadErr?.message || 'Unknown error';
-              if (typeof errMsg === 'string') {
-                if (errMsg.includes('<!DOCTYPE') || errMsg.includes('<html')) {
-                  errMsg = 'Credit API server không phản hồi — kiểm tra kết nối';
-                }
-                errMsg = errMsg.substring(0, 200);
-              }
-              const lowerErr = (typeof errMsg === 'string' ? errMsg : '').toLowerCase();
-
-              // 1. TỰ ĐỘNG DỪNG LUỒNG KHI SHOPEE GIỚI HẠN SỐ LƯỢNG ĐĂNG TRONG NGÀY
-              const isPostLimitReached = 
-                lowerErr.includes('post too many videos') || 
-                lowerErr.includes('have a rest') || 
-                lowerErr.includes('too many videos') ||
-                lowerErr.includes('frequently');
-
-              if (isPostLimitReached) {
-                console.log(`[Shopee-Limit] Tài khoản ${t.username} (Luồng #${t.id}) đã bị Shopee giới hạn số lượng video trong ngày -> Tự động dừng luồng.`);
-                consecutiveFailures.delete(t.id);
-                await Promise.all([
-                  VideoTask.updateStatus(task.id, 'failed', { error: 'Shopee giới hạn: Post too many videos, please have a rest' }),
-                  Log.create({
-                    username: t.username,
-                    status: 'error',
-                    error: `[Tự Động Dừng Luồng] Đã đạt giới hạn đăng video của Shopee trong ngày (${errMsg})`,
-                    failed_function: 'createPost'
-                  }),
-                  new Promise((res, rej) =>
-                    db.run(
-                      "UPDATE threads SET status = 'stop', error = ? WHERE id = ?",
-                      ['Shopee giới hạn: Post too many videos (Đã dừng luồng)', t.id],
-                      err => err ? rej(err) : res()
-                    )
-                  )
-                ]);
-                return;
-              }
-
-              // Phân loại lỗi: Lỗi file cục bộ vs Lỗi mạng Proxy
-              const isFileError = 
-                errMsg.includes('ENOENT') || 
-                errMsg.includes('no such file') || 
-                errMsg.includes('File video không tồn tại') || 
-                errMsg.includes('không tồn tại hoặc rỗng');
-
-              let autoChanged = false;
-              let delayAfterError = 30;
-
-              if (isFileError) {
-                // LỖI THIẾU FILE: Tuyệt đối KHÔNG đổi proxy, bỏ qua task này và nhảy sang video kế tiếp sau 5s
-                delayAfterError = 5;
-              } else {
-                // Nhận diện toàn diện các dạng lỗi do Proxy (chết kết nối, từ chối, token rỗng, time out...)
-                const isProxyError = 
-                  errMsg.includes('ECONNREFUSED') ||
-                  errMsg.includes('ETIMEDOUT') ||
-                  errMsg.includes('ECONNRESET') ||
-                  errMsg.includes('EHOSTUNREACH') ||
-                  errMsg.includes('ENOTFOUND') ||
-                  errMsg.includes('407') ||
-                  errMsg.includes('không kết nối được') ||
-                  errMsg.includes('Empty token response') ||
-                  errMsg.includes('getToken failed') ||
-                  errMsg.includes('getUploadInfo failed') ||
-                  errMsg.includes('socket hang up') ||
-                  errMsg.includes('Proxy connection timed out') ||
-                  errMsg.includes('ERR_BAD_REQUEST');
-
-                if (isProxyError) {
-                  const newProxy = await rotateThreadProxy(t.id, errMsg);
-                  if (newProxy) {
-                    autoChanged = true;
-                    delayAfterError = 5; // Thử lại ngay sau 5 giây với proxy mới
-                    consecutiveFailures.delete(t.id);
-                  }
-                } else {
-                  // Đếm số lần lỗi khác liên tiếp của luồng này
-                  const fails = (consecutiveFailures.get(t.id) || 0) + 1;
-                  consecutiveFailures.set(t.id, fails);
-                  if (fails >= 2) {
-                    const newProxy = await rotateThreadProxy(t.id, `Lỗi lặp lại ${fails} lần: ${errMsg}`);
-                    if (newProxy) {
-                      autoChanged = true;
-                      delayAfterError = 5;
-                      consecutiveFailures.delete(t.id);
-                    }
-                  }
-                }
-              }
-
-              const nextRetryTime = Math.floor(Date.now() / 1000) + delayAfterError;
-
-              await Promise.all([
-                VideoTask.updateStatus(task.id, 'failed', { error: errMsg }),
-                Log.create({
-                  username: t.username,
-                  status: 'error',
-                  error: autoChanged ? `[Tự Đổi Proxy Sống Mới] ${errMsg}` : errMsg,
-                  failed_function: uploadErr?.failedFunction || 'uploadShopeeVideo'
-                }),
-                new Promise((res, rej) =>
-                  db.run(
-                    "UPDATE threads SET error = ?, next_run_at = ? WHERE id = ?",
-                    [autoChanged ? null : errMsg, nextRetryTime, t.id],
-                    err => err ? rej(err) : res()
-                  )
-                )
-              ]);
-            }
-          } catch (thErr) {
-            console.error(`[cron] Luồng #${t.id} gặp lỗi:`, thErr);
-          } finally {
-            activeThreadIds.delete(t.id);
+        if (runnableThreads.length > 0) {
+          const toRun = runnableThreads.slice(0, availableSlots);
+          for (let i = 0; i < toRun.length; i++) {
+            const t = toRun[i];
+            activeThreadIds.add(t.id);
+            executeThread(t);
+            await new Promise(r => setTimeout(r, 60));
           }
-        })();
-        // Nhường quyền cho event loop 50ms giữa mỗi luồng để Web UI luôn mượt mà và phản hồi tức thì
-        await new Promise(r => setTimeout(r, 50));
+        }
       }
-    } catch (jobErr) {
-      console.error('[cron] Job error:', jobErr);
+    } catch (err) {
+      console.error('[cron] Queue check error:', err);
+    } finally {
+      isChecking = false;
+      setTimeout(checkQueue, 2000);
     }
-  }, 2000);
+  }
+
+  // Khởi động vòng lặp kiểm tra hàng đợi
+  setTimeout(checkQueue, 2000);
 
   // Tự động reset và kích hoạt chạy lại tất cả luồng theo lịch cấu hình
   cron.schedule('* * * * *', async () => {
