@@ -137,8 +137,6 @@ const initJobs = () => {
       await VideoTask.updateStatus(task.id, 'uploading');
       const proxyObj = parseProxyHelper(t);
 
-      console.log(`🚀 [Upload] Luồng #${t.id} (${t.username}): Bắt đầu upload video "${task.video_filename}"...`);
-
       try {
         const result = await processLocalVideoUpload(task.video_path, {
           cookie: t.cookie,
@@ -147,8 +145,6 @@ const initJobs = () => {
           products: task.products,
           country: t.country || 'vn'
         });
-
-        console.log(`✅ [Thành công] Luồng #${t.id} (${t.username}): Đã đăng video thành công! Post ID: ${result.postId}`);
 
         consecutiveFailures.delete(t.id);
         await new Promise((res) => db.run("UPDATE threads SET error = NULL WHERE id = ?", [t.id], () => res()));
@@ -185,7 +181,6 @@ const initJobs = () => {
         ]);
       } catch (uploadErr) {
         let errMsg = uploadErr?.error || uploadErr?.message || 'Unknown error';
-        console.warn(`⚠️ [Thất bại] Luồng #${t.id} (${t.username}): ${errMsg}`);
         if (typeof errMsg === 'string') {
           if (errMsg.includes('<!DOCTYPE') || errMsg.includes('<html')) {
             errMsg = 'Credit API server không phản hồi — kiểm tra kết nối';
