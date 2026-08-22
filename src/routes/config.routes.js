@@ -544,12 +544,7 @@ setInterval(() => {
   db.get('SELECT delete_video_on_success FROM config WHERE id = 1', [], (err, row) => {
     if (err || !row || !row.delete_video_on_success) return;
     cleanupCompletedVideos()
-      .then(result => {
-        if (result.deleted > 0) {
-          console.log(`🗑️ Auto-cleanup: Đã xóa ${result.deleted} video đã post thành công`);
-        }
-      })
-      .catch(err => console.error('Auto-cleanup error:', err));
+      .catch(() => {});
   });
 }, 30000); // 30 seconds
 
