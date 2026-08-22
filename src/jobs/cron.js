@@ -77,14 +77,14 @@ function parseProxyHelper(thread) {
 const initJobs = () => {
   const activeThreadIds = new Set();
   const consecutiveFailures = new Map();
-  let maxConcurrent = 60;
+  let maxConcurrent = 20; // Tối ưu để không bị nghẽn băng thông proxy
 
   const updateDynamicConcurrency = () => {
     db.get("SELECT COUNT(*) as count FROM proxies", [], (err, row) => {
       if (!err && row && row.count > 0) {
-        maxConcurrent = row.count * 2;
+        maxConcurrent = Math.min(row.count, 25); // Mỗi proxy 1 luồng upload mượt mà (tối đa 25 luồng song song)
       } else {
-        maxConcurrent = 20;
+        maxConcurrent = 15;
       }
     });
   };
@@ -325,7 +325,7 @@ const initJobs = () => {
             const t = toRun[i];
             activeThreadIds.add(t.id);
             executeThread(t);
-            await new Promise(r => setTimeout(r, 60));
+            await new Promise(r => setTimeout(r, 200));
           }
         }
       }
