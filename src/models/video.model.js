@@ -86,19 +86,28 @@ class VideoTask {
   }
 
   static async getNextPendingForUser(userId) {
-    return new Promise((resolve, reject) => {
-      db.get(
-        "SELECT * FROM video_tasks WHERE user_id = ? AND status = 'pending' ORDER BY id LIMIT 1",
-        [userId],
-        (err, row) => {
-          if (err) return reject(err);
-          if (row) {
-            row.products = JSON.parse(row.products || "[]");
-          }
-          resolve(row || null);
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        return await new Promise((resolve, reject) => {
+          db.get(
+            "SELECT * FROM video_tasks WHERE user_id = ? AND status = 'pending' ORDER BY id LIMIT 1",
+            [userId],
+            (err, row) => {
+              if (err) return reject(err);
+              if (row) {
+                try { row.products = JSON.parse(row.products || "[]"); } catch(e) { row.products = []; }
+              }
+              resolve(row || null);
+            }
+          );
+        });
+      } catch (err) {
+        if (attempt === 4 || (!err.message?.includes('BUSY') && !err.message?.includes('locked'))) {
+          throw err;
         }
-      );
-    });
+        await new Promise(r => setTimeout(r, 100 * (attempt + 1)));
+      }
+    }
   }
 
   static async updateStatus(id, status, details = {}) {
@@ -122,17 +131,24 @@ class VideoTask {
     }
     
     params.push(id);
+    const query = "UPDATE video_tasks SET " + sets.join(", ") + " WHERE id = ?";
 
-    return new Promise((resolve, reject) => {
-      db.run(
-        "UPDATE video_tasks SET " + sets.join(", ") + " WHERE id = ?",
-        params,
-        (err) => {
-          if (err) return reject(err);
-          resolve();
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        await new Promise((resolve, reject) => {
+          db.run(query, params, (err) => {
+            if (err) return reject(err);
+            resolve();
+          });
+        });
+        return;
+      } catch (err) {
+        if (attempt === 4 || (!err.message?.includes('BUSY') && !err.message?.includes('locked'))) {
+          throw err;
         }
-      );
-    });
+        await new Promise(r => setTimeout(r, 100 * (attempt + 1)));
+      }
+    }
   }
 
   static async getStats() {
