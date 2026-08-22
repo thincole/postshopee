@@ -9,21 +9,21 @@
       "isAigc": true
     },
     "ph": {
-      "videoFolder": "G:\\My Drive\\Video AI\\",
+      "videoFolder": "G:\\My Drive\\Video AI\\PH\\",
       "driveLink": "https://docs.google.com/spreadsheets/d/18OE86tzWPeKp3xlSYscmJFEQC87ZBuBwgTF8HOz8e1w/edit?gid=623566425#gid=623566425",
       "sheetName": "PH",
-      "maxVideosPerAccount": "30",
+      "maxVideosPerAccount": "69",
       "isAigc": true
     },
     "id": {
       "videoFolder": "G:\\My Drive\\Video AI\\",
       "driveLink": "https://docs.google.com/spreadsheets/d/18OE86tzWPeKp3xlSYscmJFEQC87ZBuBwgTF8HOz8e1w/edit?usp=sharing",
       "sheetName": "ID",
-      "maxVideosPerAccount": "80",
+      "maxVideosPerAccount": "10",
       "isAigc": true
     },
     "custom": {
-      "videoFolder": "G:\\My Drive\\Video AI\\MY",
+      "videoFolder": "G:\\My Drive\\Video AI\\",
       "driveLink": "https://docs.google.com/spreadsheets/d/18OE86tzWPeKp3xlSYscmJFEQC87ZBuBwgTF8HOz8e1w/edit?usp=sharing",
       "sheetName": "MY",
       "maxVideosPerAccount": "31",
@@ -31,8 +31,8 @@
     }
   },
   "general": {
-    "delayMin": "68",
-    "delayMax": "102",
+    "delayMin": "100",
+    "delayMax": "150",
     "autoStart": true,
     "deleteOnSuccess": true
   }

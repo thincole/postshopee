@@ -78,7 +78,7 @@ const initJobs = () => {
   // Bộ theo dõi các luồng đang thực thi song song
   const activeThreadIds = new Set();
   const consecutiveFailures = new Map(); // Theo dõi số lần lỗi liên tiếp của từng luồng
-  let maxConcurrent = 60; // Mặc định, tự động tính theo: Số Proxy x 2
+  let maxConcurrent = 60; // Tự động tính: Số Proxy x 2
 
   // Cập nhật giới hạn số luồng upload động theo số lượng Proxy trong database (Số Proxy x 2)
   const updateDynamicConcurrency = () => {
@@ -135,10 +135,10 @@ const initJobs = () => {
       );
       if (runnableThreads.length === 0) return;
 
-      // Lấy đủ số lượng luồng cho các slot còn trống
+      // Stagger thread launches (50ms gap) to avoid event loop starvation
       const toRun = runnableThreads.slice(0, availableSlots);
-
-      toRun.forEach((t) => {
+      for (let i = 0; i < toRun.length; i++) {
+        const t = toRun[i];
         activeThreadIds.add(t.id);
 
         // Chạy bất đồng bộ từng luồng độc lập
@@ -357,7 +357,9 @@ const initJobs = () => {
             activeThreadIds.delete(t.id);
           }
         })();
-      });
+        // Nhường quyền cho event loop 50ms giữa mỗi luồng để Web UI luôn mượt mà và phản hồi tức thì
+        await new Promise(r => setTimeout(r, 50));
+      }
     } catch (jobErr) {
       console.error('[cron] Job error:', jobErr);
     }
