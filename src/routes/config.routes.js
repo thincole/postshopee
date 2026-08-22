@@ -785,22 +785,28 @@ router.post('/sync-homeproxy', async (req, res) => {
   }
 });
 
-// Auto-sync HomeProxy on startup (non-blocking)
-setTimeout(async () => {
+// Auto-sync HomeProxy on startup (non-blocking) & định kỳ mỗi 10 phút
+async function runHomeProxySync(isStartup = false) {
   try {
     const token = await Config.getHomeProxyToken();
     if (token && token.trim()) {
+      if (isStartup) {
+        console.log('🔄 [HomeProxy] Đang kết nối và đồng bộ proxy từ HomeProxy...');
+      }
       const res = await fetchAndSyncHomeProxy();
       if (res.success) {
         console.log(`✅ [HomeProxy] Đã nạp ${res.count || 0} proxy từ HomeProxy vào Database.`);
       } else {
-        console.warn(`⚠️ [HomeProxy] Auto-sync skipped/failed: ${res.error}`);
+        console.warn(`⚠️ [HomeProxy] Đồng bộ thất bại: ${res.error}`);
       }
     }
   } catch (e) {
-    console.warn(`⚠️ [HomeProxy] Startup auto-sync error: ${e.message}`);
+    console.warn(`⚠️ [HomeProxy] Lỗi đồng bộ: ${e.message}`);
   }
-}, 3000);
+}
+
+setTimeout(() => runHomeProxySync(true), 1000);
+setInterval(() => runHomeProxySync(false), 10 * 60 * 1000);
 
 // DELETE /api/config/clear-proxies
 router.delete('/clear-proxies', (req, res) => {
